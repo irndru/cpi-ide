@@ -12,7 +12,8 @@ apt-get -y install gsl-bin
 apt-get -y install gsl-ref-html 
 apt-get -y install libgsl0-dev 
 apt-get -y install liblapack-dev 
-apt-get -y install gtksourceview3 
+apt-get -y install libgtksourceview-3.0 
+apt-get -y install libgtksourceview-dev-3.0
 apt-get -y install cabal-install 
 cabal update
 cabal install gtk2hs-buildtools --global
