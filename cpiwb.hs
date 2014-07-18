@@ -275,7 +275,8 @@ plotFileCmd x = do env <- getEnv;
                                      let solns = solveODEoctave env proc mts dpdt ts
                                      let ss = speciesIn env dpdt
                                      let ss' = speciesInProc proc
-                                     lift$lift$plotTimeSeriesToFileFiltered ts' solns ss ss' file
+                                     lift$lift$plotTimeSeriesToFile ts' solns ss  file
+				     return ()
 
 -- plotAll Command
 -- Plot all species (inc complexes)

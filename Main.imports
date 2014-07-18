@@ -1,0 +1,54 @@
+import Data.Default.Class ( Default(def) )
+import Graphics.UI.Gtk.Misc.DrawingArea
+    ( DrawingArea, drawingAreaNew )
+import System.Random ( Random(randoms), mkStdGen )
+import Graphics.Rendering.Chart
+    ( Renderable(render),
+      ToRenderable(toRenderable),
+      ToPlot(toPlot),
+      LogValue(..),
+      plot_lines_values,
+      plot_lines_title,
+      plot_lines_style,
+      layout_title,
+      layout_plots,
+      solidLine,
+      bitmapAlignmentFns )
+import Graphics.Rendering.Cairo ( Render )
+import Graphics.UI.Gtk
+    ( AttrOp((:=)),
+      Attr,
+      get,
+      on,
+      ResponseId(ResponseOk),
+      Packing(PackGrow),
+      layoutEmpty,
+      cairoCreateContext,
+      dialogRun,
+      dialogNew,
+      dialogGetContentArea,
+      dialogAddButton,
+      castToBox,
+      stockOk,
+      initGUI,
+      widgetShow,
+      widgetSetSizeRequest,
+      draw,
+      boxPackStart,
+      objectCreateAttribute )
+import Graphics.Rendering.Chart.Layout as Lay ( Layout )
+import Graphics.Rendering.Chart.Backend.Cairo
+    ( runBackend, defaultEnv )
+import Data.Colour.Names ( red, green, blue )
+import Data.Colour.SRGB ( sRGB )
+import Data.Colour ( AlphaColour, opaque )
+import Control.Monad ( void )
+import Control.Lens ( (.~) )
+import qualified Control.Exception as X ()
+import qualified Numeric.LinearAlgebra as LA ()
+import CPi.Lib ()
+import CPi.MyGTKRender ()
+import System.IO ()
+import System.IO.Unsafe ( unsafePerformIO )
+import qualified System.Glib.Attributes as A ( set )
+import Control.Concurrent.MVar ()

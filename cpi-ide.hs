@@ -4,13 +4,20 @@ import System.IO
       hGetContents,
       openFile,
       hClose )
+import System.IO.Unsafe
+import qualified Graphics.UI.Gtk.Misc.DrawingArea as DRAW
+import Graphics.UI.Gtk.Misc.DrawingArea
+    (DrawingArea,
+      castToDrawingArea,
+      drawingAreaNew )
+
 import Graphics.UI.Gtk
-    ( DrawingArea,
-      AttrOp((:=)),
+    ( AttrOp((:=)),
       Window,
       Color(Color),
       VBox,
       TreeView,
+      TreeModel,
       ToolButton,
       Notebook,
       MenuBar,
@@ -27,7 +34,6 @@ import Graphics.UI.Gtk
       TextWindowType(TextWindowLeft),
       Packing(PackGrow, PackNatural),
       ConnectId,
-      windowSetTitle,
       windowResize,
       windowPresent,
       castToWindow,
@@ -40,7 +46,6 @@ import Graphics.UI.Gtk
       castToHBox,
       castToFileChooserDialog,
       castToEntry,
-      castToDrawingArea,
       castToComboBox,
       castToCellRendererText,
       castToButton,
@@ -53,8 +58,11 @@ import Graphics.UI.Gtk
       textBufferGetText,
       textBufferGetStartIter,
       textBufferGetEndIter,
+      treeViewGetColumns,
+      treeViewColumnSetMaxWidth,
       treeViewColumnSetTitle,
       treeViewColumnNew,
+      treeViewGetModel,
       treeViewSetModel,
       treeViewNew,
       treeViewAppendColumn,
@@ -67,32 +75,29 @@ import Graphics.UI.Gtk
       cellRendererTextNew,
       cellLayoutSetAttributes,
       cellLayoutPackStart,
-      drawingAreaNew,
       onToolButtonClicked,
-      onActivateLeaf,
+      menuItemActivated,
       comboBoxSetModelText,
       comboBoxNewText,
       comboBoxGetActive,
+      comboBoxSetActive,
       comboBoxAppendText,
       changed,
       hBoxNew,
-      widgetGetSize,
       mainQuit,
       mainGUI,
       initGUI,
       entrySetText,
       entryNew,
       entryGetText,
-      entryAppendText,
       labelSetText,
       labelSetLabel,
       labelNew,
       labelGetText,
       toggleButtonActive,
-      onToggled,
+      toggled,
       linkButtonNewWithLabel,
       checkButtonNewWithLabel,
-      onClicked,
       buttonNewWithLabel,
       buttonActivated,
       builderNew,
@@ -100,26 +105,33 @@ import Graphics.UI.Gtk
       builderAddFromFile,
       widgetWidthRequest,
       widgetShowAll,
+      widgetGetSizeRequest,
       widgetSetSizeRequest,
       widgetSetSensitive,
       widgetHide,
       widgetHeightRequest,
-      onExpose,
-      onDestroy,
       containerRemove,
       containerGetChildren,
       boxReorderChild,
       boxQueryChildPacking,
-      boxPackStartDefaults,
-      boxPackEndDefaults,
+      boxPackStart,
+      boxPackEnd,
       boxChildPosition,
       boxChildPacking,
       on,
-      set )
+      set,
+      windowTitle,
+      deleteEvent, 
+      exposeEvent,
+      objectDestroy,
+      mapSignal)
 import Graphics.UI.Gtk ()
 import Graphics.UI.Gtk.Builder ()
 import Graphics.UI.Gtk.ModelView as Model
-    ( treeViewColumnSetTitle,
+    ( listStoreSetValue,
+      castToTreeView,
+      castToTreeModel,
+      treeViewColumnSetTitle,
       treeViewColumnNew,
       treeViewSetHeadersVisible,
       treeViewNewWithModel,
@@ -137,8 +149,6 @@ import Graphics.UI.Gtk.SourceView
       sourceLanguageManagerNew,
       sourceLanguageManagerGetSearchPath,
       sourceLanguageManagerGetLanguage,
-      sourceGutterSetCellSizeFunc,
-      sourceGutterSetCellDataFunc,
       sourceBufferSetHighlightSyntax,
       sourceBufferNewWithLanguage )
 import Graphics.UI.Gtk.Layout.Table ()
@@ -172,21 +182,25 @@ import CPi.Plot
       plotTimeSeriesFilteredD,
       plotTimeSeriesD,
       phasePlot2ToFile,
-      phasePlot2D )
+      phasePlot2D,
+      getRender )
+import CPi.MyGTKRender--}
 import CPi.Logic ( reconcileSpecs )
 import CPi.Matlab ()
 import CPi.Signals ( modelCheckSig )
 import System.GIO.File.AppInfo
     ( appInfoLaunchUris, appInfoGetAllForType )
 import qualified Data.List as L ( (\\) )
-import qualified Numeric.LinearAlgebra as LA ( toColumns, toList )
+import qualified Numeric.LinearAlgebra as LA ( Vector, Matrix, toColumns, toList )
 import Data.String.Utils as Utils ( strip, replace )
 import Data.Tuple ()
 import Graphics.UI.Gtk as GTK ( get )
 import Hledger.Cli.Utils ()
 import qualified Data.Text as T ( singleton, pack, count )
-
-
+import Graphics.Rendering.Cairo(
+	liftIO)
+import System.Glib.Attributes
+import System.Glib
 
 
 
@@ -222,16 +236,17 @@ editor gui defs plots = do
 		gutter <- sourceViewGetGutter mainText TextWindowLeft
  		cell   <- cellRendererTextNew
   		--sourceGutterInsert gutter cell 0
-		sourceGutterSetCellDataFunc gutter cell $ \ c l currentLine -> do
+		{--sourceGutterSetCellDataFunc gutter cell $ \ c l currentLine -> do
 			set (castToCellRendererText c) [cellText := show (l + 1)]
 			let color = if currentLine 
 		                	then Color 65535 0 0 
 		                    	else Color 0 65535 0
 		 	set (castToCellRendererText c) [cellTextForegroundColor := color]
 	  	sourceGutterSetCellSizeFunc gutter cell $ \ c -> 
-      			set (castToCellRendererText c) [cellTextWidthChars := (2)]
+      			set (castToCellRendererText c) [cellTextWidthChars := (2)]--}
 		widgetSetSizeRequest mainText 450 200
-		boxPackStartDefaults (hbox1 gui) mainText 
+		
+		boxPackStart (hbox1 gui) mainText  PackNatural 0
 		boxReorderChild (hbox1 gui) mainText   0
 		connectGui gui defs plots mainText
 		widgetShowAll mainText
@@ -243,8 +258,9 @@ loadGlade gladepath =
         builder <- builderNew
     	builderAddFromFile builder gladepath
         mw <- builderGetObject builder castToWindow "MainWindow"
-        windowSetTitle mw "CPIDE"
-        windowResize mw 1200 500
+	set mw [ windowTitle :=  "CPIDE"]
+
+        windowResize mw 900 400
 	mainMenu <- builderGetObject builder castToMenuBar "mainMenu"
 	[fileOpen,fileSaveAs,fileQuit] <- mapM (builderGetObject builder castToImageMenuItem) ["FileOpen","FileSaveAs","FileQuit"]
 	aboutOpen <- builderGetObject builder castToImageMenuItem "aboutOpen"
@@ -254,8 +270,8 @@ loadGlade gladepath =
 	csvSaviour <- builderGetObject builder castToFileChooserDialog "csvSaveFileDialog"
 	csvSaviourBtn <- builderGetObject builder castToButton "csvSaviourBtn"
 	csvSaviourBtnCancel <- builderGetObject builder castToButton "csvSaviourBtnCancel"
-	drawArea <- builderGetObject builder castToDrawingArea "drawingarea1"
-	drawArea2 <- builderGetObject builder castToDrawingArea "drawingarea2"
+	drawingArea1 <- builderGetObject builder castToDrawingArea "drawingarea1"
+	drawingArea2 <- builderGetObject builder castToDrawingArea "drawingarea2"
 	dropHBox <- builderGetObject builder castToHBox	"dropHBox"
 	dynamiclabel<- builderGetObject builder castToLabel "dynamiclabel"
 	entry1 <- builderGetObject builder castToEntry "entry1"
@@ -288,6 +304,7 @@ loadGlade gladepath =
 	hbox18 <- builderGetObject builder castToHBox "hbox18"
 	hbox19 <- builderGetObject builder castToHBox "hbox19"
 	hbox2 <- builderGetObject builder castToHBox "hbox2"
+	liststore1 <- builderGetObject builder castToTreeModel "liststore1"
 	mdlChk <- builderGetObject builder castToToolButton "mdlChkButton"
 	modellabel <- builderGetObject builder castToLabel "modellabel"
 	newBtn <- builderGetObject builder castToButton "newBtn"
@@ -323,6 +340,7 @@ loadGlade gladepath =
 	simStartEntry  <- builderGetObject builder castToEntry "simStartEntry"
 	staticlabel<- builderGetObject builder castToLabel "staticlabel"
 	tablabel <- builderGetObject builder castToLabel "tablabel"
+	treeView1 <- builderGetObject builder castToTreeView "treeView1"
 	vbox5 <- builderGetObject builder castToVBox "vbox5"
 	vbox8 <- builderGetObject builder castToVBox "vbox8"
 	vbox13 <- builderGetObject builder castToVBox "vbox13"
@@ -339,8 +357,8 @@ loadGlade gladepath =
 		csvSaviour 
 		csvSaviourBtn 
 		csvSaviourBtnCancel
-		drawArea
-		drawArea2
+		drawingArea1
+		drawingArea2
 		dropHBox
 		dynamiclabel
 		entry1
@@ -377,6 +395,7 @@ loadGlade gladepath =
 		hbox18
 		hbox19
 		hbox2
+		liststore1
 		mdlChk
 		modellabel
 		mw
@@ -413,6 +432,7 @@ loadGlade gladepath =
 		simStartEntry
 		staticlabel
 		tablabel
+		treeView1
 		vbox5
 		vbox8
 		vbox13
@@ -431,8 +451,8 @@ data GUI = GUI {
 	csvSaviour :: FileChooserDialog,
 	csvSaviourBtn :: Button,
 	csvSaviourBtnCancel :: Button,
-	drawArea :: DrawingArea,
-	drawArea2 :: DrawingArea,
+	drawingArea1 :: DrawingArea,
+	drawingArea2 :: DrawingArea,
 	dropHBox :: HBox,
 	dynamiclabel :: Label,
 	entry1 :: Entry,
@@ -469,6 +489,7 @@ data GUI = GUI {
 	hbox18 :: HBox,
 	hbox19 :: HBox,
 	hbox2 :: HBox,
+	liststore1 :: TreeModel,
 	mdlChk :: ToolButton,
 	modellabel :: Label,
 	mainWin :: Window,
@@ -505,6 +526,7 @@ data GUI = GUI {
 	simStartEntry :: Entry,
 	staticlabel :: Label,
 	tablabel :: Label,
+	treeView1 :: TreeView,
 	vbox5 :: VBox,
 	vbox8 :: VBox,
 	vbox13 :: VBox,
@@ -519,37 +541,40 @@ data GUI = GUI {
 connectGui :: GUI -> Barrier [Definition]  -> Barrier [Bool] -> SourceView -> IO (ConnectId Button)
 connectGui gui defs plots mainText =
     do
-        onDestroy (mainWin gui) mainQuit
-        onActivateLeaf (fileOpen gui) $ windowPresent $ opener gui 
+	on  (mainWin gui) objectDestroy mainQuit
+        on (fileOpen gui)  menuItemActivated $ windowPresent $ opener gui 
 
-        onActivateLeaf (fileSaveAs gui) $ saveAs gui
-        onActivateLeaf (fileQuit gui) mainQuit
-	onActivateLeaf (aboutOpen gui) $ windowPresent $ aboutDialog gui
-        onClicked (aboutCloseBtn gui) $ widgetHide $ aboutDialog gui
+        on (fileSaveAs gui)  menuItemActivated $ saveAs gui
+        on (fileQuit gui) menuItemActivated mainQuit
+	on (aboutOpen gui)  menuItemActivated $ windowPresent $ aboutDialog gui
+        on (aboutCloseBtn gui)  buttonActivated $ widgetHide $ aboutDialog gui
 
 
         onToolButtonClicked (parse gui ) $ parseClicked gui defs mainText
  	onToolButtonClicked (ode gui) $ odeClicked gui defs
-	onClicked (simButton gui) ( do 
+	on (simButton gui)  buttonActivated ( do 
 					plotClicked gui defs plots
 					tableClicked gui defs
+					comboBoxSetActive (phaseSpecies1Combobox gui) 0 
+					comboBoxSetActive (phaseSpecies2Combobox gui) 1 
+					
 					)
 
         onToolButtonClicked (mdlChk gui) $ modelCheckClicked gui defs
-	onClicked (csvButton gui) $ saveCSVas defs gui
-	onClicked (phaseButton gui) $ phaseClicked gui defs
+	on (csvButton gui)  buttonActivated $ saveCSVas defs gui
+	on (phaseButton gui)  buttonActivated $ phaseClicked gui defs
 --opener 
-        onClicked (openerBtn gui) $ openerBtnClicked gui mainText
-        onClicked (openerBtnCancel gui) $ widgetHide $ opener gui
---saver       
-        onClicked (saviourBtn gui) $ saviourSaveBtnClicked gui mainText
-        onClicked (csvSaviourBtn gui) $ csvSaviourSaveBtnClicked defs gui 
+        on (openerBtn gui)  buttonActivated $ openerBtnClicked gui mainText
+        on (openerBtnCancel gui)  buttonActivated $ widgetHide $ opener gui
+--saver      
+        on (saviourBtn gui)  buttonActivated $ saviourSaveBtnClicked gui mainText
+        on (csvSaviourBtn gui)  buttonActivated $ csvSaviourSaveBtnClicked defs gui 
 		
 
-        onClicked (saviourBtnCancel gui) $ widgetHide $ saviour gui
-        onClicked (csvSaviourBtnCancel gui) $ widgetHide $ csvSaviour gui
+        on (saviourBtnCancel gui)  buttonActivated $ widgetHide $ saviour gui
+        on (csvSaviourBtnCancel gui)  buttonActivated $ widgetHide $ csvSaviour gui
 
-	(newBtn gui ) `on` buttonActivated $ alter gui defs
+	on (newBtn gui )  buttonActivated $ alter gui defs
 
 
 
@@ -614,10 +639,10 @@ collectTim gui line hb cb f t  defs sourceView = do
 						box <- containerGetChildren (dropHBox gui)
 						mapM_ (containerRemove (dropHBox gui)) box
 						leftBtn <- buttonNewWithLabel "<-"
-						leftBtn `on` buttonActivated $ removeLblT gui line leftBtn timLbl defs sourceView endIt
-						boxPackStartDefaults line leftBtn
+						on leftBtn  buttonActivated $ removeLblT gui line leftBtn timLbl defs sourceView endIt
+						boxPackStart line leftBtn PackNatural 0
 						boxReorderChild line (dropHBox gui) 0				
-						boxPackStartDefaults line timLbl
+						boxPackStart line timLbl PackNatural 0
 						initComboTV gui line defs sourceView
 						set line [boxChildPacking leftBtn := PackNatural, boxChildPacking timLbl := PackNatural]
 						boxReorderChild line (dropHBox gui) 1
@@ -716,15 +741,15 @@ initComboTV gui line defs sv  = do
 			cb <- comboBoxNewText			
 			comboBoxAppendText cb "Time"
 			comboBoxAppendText cb "Value"
-			boxPackStartDefaults (dropHBox gui) cb
-			cb `on` changed $ collectComboTV gui line cb defs sv
+			boxPackStart (dropHBox gui) cb PackNatural 0
+			on cb  changed $ collectComboTV gui line cb defs sv
 			widgetShowAll (dropHBox gui)
 
 initComboT :: GUI -> HBox -> Var [Definition] -> SourceView -> IO ()
 initComboT gui line defs sv = do
 			cb <- comboBoxNewText			
 			comboBoxAppendText cb "Time"
-			boxPackStartDefaults (dropHBox gui) cb
+			boxPackStart (dropHBox gui) cb PackNatural 0
 			cb `on` changed $ collectComboT gui line defs sv
 			widgetShowAll (dropHBox gui)
 
@@ -732,7 +757,7 @@ initComboV :: GUI -> HBox -> Var [Definition] -> SourceView -> IO ()
 initComboV gui line defs  sv = do
 			cb <- comboBoxNewText			
 			comboBoxAppendText cb "Value"
-			boxPackEndDefaults (dropHBox gui) cb
+			boxPackEnd (dropHBox gui) cb PackNatural 0
 			cb `on` changed $ collectComboV gui line defs sv
 			widgetShowAll (dropHBox gui)
 
@@ -740,7 +765,7 @@ initComboVfromO :: GUI -> HBox -> Var [Definition] -> SourceView -> IO ()
 initComboVfromO gui line defs  sv = do
 			cb <- comboBoxNewText			
 			comboBoxAppendText cb "Value"
-			boxPackEndDefaults (dropHBox gui) cb
+			boxPackEnd (dropHBox gui) cb PackNatural 0
 			cb `on` changed $ collectComboVfromO gui line defs sv
 			widgetShowAll (dropHBox gui)
 
@@ -761,7 +786,7 @@ initComboO gui line defs  sv = do
 					comboBoxAppendText cb "Done"
 					comboBoxAppendText cb "Or"
 						
-			boxPackEndDefaults (dropHBox gui) cb
+			boxPackEnd (dropHBox gui) cb PackNatural 0
 			cb `on` changed $ collectComboO gui line defs sv cb
 			widgetShowAll (dropHBox gui)
 
@@ -776,11 +801,11 @@ collectComboO gui line defs sv cb = do
 					box <- containerGetChildren (dropHBox gui)
 					mapM_ (containerRemove (dropHBox gui)) box
 					comboAddOp gui line hb defs sv 
-					boxPackStartDefaults (dropHBox gui) hb
+					boxPackStart (dropHBox gui) hb  PackNatural 0
 				else do
 					hb <- hBoxNew False 3
 					fLbl <- labelNew (Just "Or")
-					boxPackStartDefaults hb fLbl
+					boxPackStart hb fLbl  PackNatural 0
 					text <- entryGetText (entry1 gui) 
 					let n = T.count (T.singleton '(') (T.pack text)
 					let str = take n (repeat ')') 
@@ -790,9 +815,9 @@ collectComboO gui line defs sv cb = do
 					box <- containerGetChildren (dropHBox gui)
 					mapM_ (containerRemove (dropHBox gui)) box
 					containerRemove line (dropHBox gui) 
-					boxPackStartDefaults  hb (dropHBox gui)
+					boxPackStart  hb (dropHBox gui)  PackNatural 0
 					initComboTV gui hb defs sv
-					boxPackStartDefaults (vbox14 gui) hb
+					boxPackStart (vbox14 gui) hb PackNatural 0
 					set (vbox14 gui) [boxChildPacking hb := PackNatural]
 					packing1 <- boxQueryChildPacking hb (dropHBox gui)
 					set hb [boxChildPacking (dropHBox gui) := PackNatural, boxChildPacking fLbl := PackNatural]
@@ -829,16 +854,16 @@ removeAll gui line defs sv = do
 			hb <- hBoxNew False 3
 			fBtn <- buttonNewWithLabel "clear"
 			fLbl <- labelNew (Just "outcome")
-			boxPackStartDefaults hb newEntry 
-			boxPackStartDefaults hb fLbl
-			boxPackStartDefaults hb fBtn 
+			boxPackStart hb newEntry  PackNatural 0
+			boxPackStart hb fLbl PackNatural 0
+			boxPackStart hb fBtn  PackNatural 0
 			connectFormula newEntry fLbl tds
 			widgetSetSizeRequest hb 0 20
  			set hb [boxChildPacking fBtn := PackNatural, boxChildPacking fLbl := PackNatural, boxChildPacking newEntry := PackGrow
 				]
 
-			boxPackStartDefaults (vbox14 gui) hb
-			fBtn `onClicked` containerRemove (vbox14 gui) hb
+			boxPackStart (vbox14 gui) hb PackNatural 0
+			fBtn `on` buttonActivated $ containerRemove (vbox14 gui) hb
 			widgetShowAll (vbox14 gui)
 			
 			
@@ -869,9 +894,9 @@ comboAddOp gui line hb defs sv = do
 	addOp cb
 	cb `on` changed $ hotSwapComboO gui line cb hb defs sv
 	leftBtn <- buttonNewWithLabel "<-"
-	boxPackStartDefaults hb leftBtn
+	boxPackStart hb leftBtn  PackNatural 0
 	set hb [boxChildPacking leftBtn := PackNatural]
-	boxPackStartDefaults hb cb
+	boxPackStart hb cb PackNatural 0
 	leftBtn `on` buttonActivated $ removeHBoxO gui line hb defs sv
 	widgetShowAll hb
 
@@ -882,7 +907,7 @@ comboAddVal gui line hb defs sv = do
 	cb <- comboBoxNewText
 	addVal cb
 	cb `on` changed $ hotSwapComboTV gui line cb hb defs sv 
-	boxPackStartDefaults hb cb
+	boxPackStart hb cb  PackNatural 0
 	widgetShowAll hb
 
 
@@ -892,7 +917,7 @@ comboAddValfromO gui line hb defs sv = do
 	addVal cb
 
 	cb `on` changed $ hotSwapComboTV gui line cb hb defs sv 
-	boxPackStartDefaults hb cb
+	boxPackStart hb cb PackNatural 0
 	widgetShowAll hb
 
 
@@ -910,8 +935,8 @@ hotSwapComboO gui line cb hb defs sv = do
 					addRel cb
 					relBtn <- buttonNewWithLabel "Add"
 		 			relBtn  `on` buttonActivated $ collectOpR gui line defs cb sv 
-					boxPackStartDefaults hb cb 
-					boxPackStartDefaults hb relBtn
+					boxPackStart hb cb  PackNatural 0
+					boxPackStart hb relBtn PackNatural 0
 					boxReorderChild hb cb 2
 					widgetShowAll hb
 			else do		
@@ -919,8 +944,8 @@ hotSwapComboO gui line cb hb defs sv = do
 					addAri cb
 					ariBtn <- buttonNewWithLabel "Add"
 		 			ariBtn  `on` buttonActivated $ collectOpA gui line defs cb sv 
-					boxPackStartDefaults hb cb 
-					boxPackStartDefaults hb ariBtn
+					boxPackStart hb cb  PackNatural 0
+					boxPackStart hb ariBtn PackNatural 0
 					boxReorderChild hb cb 2
 					widgetShowAll hb
 
@@ -939,10 +964,10 @@ collectOpR gui line defs cb sv = do
 				leftBtn <- buttonNewWithLabel "<-"
 				leftBtn `on` buttonActivated $ removeLblO gui line leftBtn opLbl defs sv endIt
 				initComboVfromO gui line defs sv
-				boxPackStartDefaults line leftBtn
+				boxPackStart line leftBtn PackNatural 0
 
 				boxReorderChild line (dropHBox gui) 0				
-				boxPackStartDefaults line opLbl
+				boxPackStart line opLbl PackNatural 0
 				set line [boxChildPacking leftBtn := PackNatural, boxChildPacking opLbl := PackNatural ]
 				boxReorderChild line (dropHBox gui) 1
 				box2 <- containerGetChildren line
@@ -972,10 +997,10 @@ collectOpA gui line defs cb sv = do
 				leftBtn <- buttonNewWithLabel "<-"
 				leftBtn `on` buttonActivated $ removeLblO gui line leftBtn opLbl defs sv endIt
 				initComboVfromO gui line defs sv
-				boxPackStartDefaults line leftBtn
+				boxPackStart line leftBtn PackNatural 0
 
 				boxReorderChild line (dropHBox gui) 0				
-				boxPackStartDefaults line opLbl	
+				boxPackStart line opLbl	 PackNatural 0
 				set line [boxChildPacking leftBtn := PackNatural, boxChildPacking opLbl := PackNatural ]
 				boxReorderChild line (dropHBox gui) 1
 				box2 <- containerGetChildren line
@@ -1021,13 +1046,13 @@ comboAddTim gui line defs sv =
 	timBtn <- buttonNewWithLabel "Add"
 	set fromTim [ widgetWidthRequest := 50]
 	set toTim [ widgetWidthRequest := 50]
-	boxPackStartDefaults hb cb
-	boxPackStartDefaults hb fromTim
-	boxPackStartDefaults hb toTim
-	boxPackStartDefaults hb timBtn
+	boxPackStart hb cb PackNatural 0
+	boxPackStart hb fromTim PackNatural 0
+	boxPackStart hb toTim PackNatural 0
+	boxPackStart hb timBtn PackNatural 0
 	set hb [ boxChildPacking fromTim := PackNatural, boxChildPacking toTim := PackNatural, boxChildPacking timBtn := PackNatural, boxChildPacking cb := PackNatural ]
 	timBtn  `on` buttonActivated $ collectTim gui line hb cb fromTim toTim defs sv
-	boxPackEndDefaults (dropHBox gui) hb
+	boxPackEnd (dropHBox gui) hb  PackNatural 0
 	widgetShowAll hb 
 	
 
@@ -1038,7 +1063,7 @@ collectComboV gui line defs sv = do
 			box <- containerGetChildren (dropHBox gui)
 			containerRemove (dropHBox gui) (box!!(0))
 			comboAddVal gui line hb defs sv 
-			boxPackStartDefaults (dropHBox gui) hb
+			boxPackStart (dropHBox gui) hb PackNatural 0
 
 collectComboVfromO :: GUI -> HBox -> Var [Definition] -> SourceView -> IO()
 collectComboVfromO gui line defs sv = do
@@ -1046,7 +1071,7 @@ collectComboVfromO gui line defs sv = do
 			box <- containerGetChildren (dropHBox gui)
 			containerRemove (dropHBox gui) (box!!(0))
 			comboAddValfromO gui line hb defs sv 
-			boxPackStartDefaults (dropHBox gui) hb
+			boxPackStart (dropHBox gui) hb PackNatural 0
 
 
 
@@ -1065,10 +1090,10 @@ collectValS gui line defs sns cb sv = do
 					leftBtn <- buttonNewWithLabel "<-"
 					leftBtn `on` buttonActivated $ removeLblV gui line leftBtn specLbl defs sv endIt
 					initComboO gui line defs sv 
-					boxPackStartDefaults line leftBtn
+					boxPackStart line leftBtn PackNatural 0
 
 					boxReorderChild line (dropHBox gui) 0				
-					boxPackStartDefaults line specLbl
+					boxPackStart line specLbl PackNatural 0
 					set line [boxChildPacking leftBtn := PackNatural, boxChildPacking specLbl := PackNatural]
 					boxReorderChild line (dropHBox gui) 1
 					box2 <- containerGetChildren line
@@ -1083,7 +1108,13 @@ collectValS gui line defs sns cb sv = do
 					boxReorderChild line (dropHBox gui) x
 					widgetShowAll line
 				else return()
-	
+
+
+entryAppendText :: Entry -> String -> IO()
+entryAppendText entry str = do 
+				tmpstr <- entryGetText entry
+				entrySetText entry  ( tmpstr ++str)
+
 
 
 collectValN :: GUI -> HBox  -> HBox -> Entry -> Var [Definition] -> SourceView -> IO()
@@ -1099,10 +1130,10 @@ collectValN gui line hb valEntry defs  sv = do
 		leftBtn <- buttonNewWithLabel "<-"
 		leftBtn `on` buttonActivated $ removeLblV gui line leftBtn valLbl defs sv endIt
 		initComboO gui line defs sv
-		boxPackStartDefaults line leftBtn
+		boxPackStart line leftBtn PackNatural 0
 
 		boxReorderChild line (dropHBox gui) 0				
-		boxPackStartDefaults line valLbl		
+		boxPackStart line valLbl PackNatural 0
 		set line [boxChildPacking leftBtn := PackNatural, boxChildPacking valLbl := PackNatural]
 		boxReorderChild line (dropHBox gui) 1
 		box2 <- containerGetChildren line
@@ -1142,8 +1173,8 @@ hotSwapComboTV gui line cb hb defs sv = do
 					addSpecs cb sns (length(sns)) (length(sns))
 					valBtn <- buttonNewWithLabel "Add"
 					valBtn  `on` buttonActivated $ collectValS gui line defs sns cb sv
-					boxPackStartDefaults hb cb 
-					boxPackEndDefaults hb valBtn
+					boxPackStart hb cb PackNatural 0
+					boxPackEnd hb valBtn PackNatural 0
 					boxReorderChild hb cb 2
 					widgetShowAll hb
 			else do
@@ -1153,8 +1184,8 @@ hotSwapComboTV gui line cb hb defs sv = do
 				valBtn <- buttonNewWithLabel "Add"
 				
 				valBtn  `on` buttonActivated $ collectValN gui line  hb valEntry defs sv
-				boxPackStartDefaults hb valEntry 
-				boxPackEndDefaults hb valBtn
+				boxPackStart hb valEntry PackNatural 0
+				boxPackEnd hb valBtn  PackNatural 0
 				set hb [ boxChildPacking valEntry := PackNatural]
 		
 				boxReorderChild hb valEntry 2
@@ -1178,7 +1209,9 @@ openerBtnClicked gui mainText =
                     inputData <- hGetContents inf
                     buff <- textViewGetBuffer mainText 
                     textBufferSetText buff inputData
-                    windowSetTitle (mainWin gui) (init(tail fileName) )
+
+		    set (mainWin gui) [ windowTitle :=   (init(tail fileName)) ]
+
                     hClose inf
                     widgetHide (opener gui)        
 
@@ -1213,7 +1246,7 @@ csvSaviourSaveBtnClicked defs gui =
 --plotSave :: Var[Definition] -> GUI -> IO ()
 plotSave gui plots ts' solns ss' =
     do
-	onClicked (plotSaviourBtn gui) $ plotSaviourBtnClicked  gui plots ts' solns ss'
+	(plotSaviourBtn gui) `on` buttonActivated $ plotSaviourBtnClicked  gui plots ts' solns ss'
 	fileChooserSetAction (plotSaviour gui) FileChooserActionSave            
         windowPresent (plotSaviour gui)
 
@@ -1233,13 +1266,13 @@ plotFilterAndSave file gui plots ts solns ss = do
 		a <- readVar plots
 		let blss = zip a ss 
 		let fs = specFill blss	
-
+		print ""
 		plotTimeSeriesToFile ts solns ss  file 
 
 
 phaseSave gui ts' solns ss ss' =
     do
-	onClicked (phaseSaviourBtn gui) $ phaseSaviourBtnClicked  gui ts' solns ss ss' 
+	(phaseSaviourBtn gui) `on` buttonActivated $ phaseSaviourBtnClicked  gui ts' solns ss ss' 
 	fileChooserSetAction (phaseSaviour gui) FileChooserActionSave            
         windowPresent (phaseSaviour gui)
 
@@ -1251,7 +1284,7 @@ phaseSaviourBtnClicked  gui ts' solns ss ss' =
 		file <- fileChooserGetFilename (phaseSaviour gui) 
         	case file of
            		Just fpath -> do
-				phasePlot2ToFile ts' solns ss ss' (init(tail(show fpath)))
+				--phasePlot2ToFile ts' solns ss ss' (init(tail(show fpath)))
 				--plotFilterAndSave (init(tail(show fpath))) gui  plots ts' solns ss'
 				widgetHide (phaseSaviour gui) 
             		Nothing -> widgetHide (opener gui) 
@@ -1280,7 +1313,7 @@ save fileName gui mainText =
         hPutStrLn outh text
         hClose outh
         widgetHide (saviour gui)
-        windowSetTitle (mainWin gui) (fileName)
+	set (mainWin gui) [ windowTitle :=   fileName ]
 	textBufferSetModified buff False
 
 
@@ -1291,7 +1324,9 @@ save fileName gui mainText =
 parseClicked :: GUI -> Var [Definition] -> SourceView -> IO ()
 parseClicked gui defs mainText =
 	    do
-		
+		coltemp <- treeViewGetColumns (treeView1 gui)
+		modelList <- listStoreNew (["Charlie","Delta"])
+		treeViewSetModel (treeView1 gui) modelList
 		buff <- textViewGetBuffer mainText 
 		si <- textBufferGetStartIter buff
 		ei <- textBufferGetEndIter buff
@@ -1315,14 +1350,30 @@ parseClicked gui defs mainText =
 				let cs = pssss ++ [" "]
 				let ls = lines(prettys tds)
 				let [s,d] = transpose (map (splitOn "=") ls)
-				addTreeview s gui (hbox18 gui) "Species" 50
+				
+				--listStoreAppend (liststore1 gui) "Beta"
+				addTreeview s gui (hbox18 gui) "Species" 60
 				addTreeview d gui (hbox18 gui) "Definitions" 200
 				addTreeview cs gui (hbox18 gui) "Concentration" 40
 				onCom text s gui
 				widgetShowAll (hbox18 gui)
 				widgetShowAll (odelabel gui)
 				widgetShowAll (vbox15 gui)
-				
+	
+
+addTreeview ls gui w str n  = do 
+		list <- listStoreNew ls
+		treeview <- Model.treeViewNewWithModel list
+		Model.treeViewSetHeadersVisible treeview True 
+	    	col <- Model.treeViewColumnNew
+		Model.treeViewColumnSetTitle col str
+		renderer <- Model.cellRendererTextNew
+		Model.cellLayoutPackStart col renderer False
+		Model.cellLayoutSetAttributes col renderer list
+			$ \ind -> [Model.cellText := ind]
+		Model.treeViewAppendColumn treeview col
+		treeViewColumnSetMaxWidth col n
+		boxPackStart w treeview PackNatural 0			
 
 
 onCom text specs gui = do
@@ -1341,7 +1392,7 @@ onCom text specs gui = do
 		mapM_ (containerRemove (vbox8 gui)) box
 		linkLbl <- labelNew (Just "Link")
 		set linkLbl [ widgetHeightRequest := 22]
-		boxPackStartDefaults (vbox8 gui) linkLbl
+		boxPackStart (vbox8 gui) linkLbl PackNatural 0
 		set (vbox8 gui) [ boxChildPacking linkLbl := PackNatural]
 		meh ids us (vbox8 gui)
 		widgetShowAll (notebook1 gui)
@@ -1365,9 +1416,9 @@ meh [] [] _ = return()
 meh (x:xs) (y:ys) bx = 
 			do
 				uri <- linkButtonNewWithLabel y x
-				boxPackStartDefaults bx uri
+				boxPackStart bx uri PackNatural 0
 				set bx [ boxChildPacking uri := PackNatural]
-				sz <- widgetGetSize uri
+
 		 		set uri [ widgetHeightRequest := 24]
 				meh xs ys bx
 			
@@ -1397,19 +1448,7 @@ onlinecomments (l:ls) =
 multiDel [] _ = []
 multiDel (w:ws) ls = (delete w ls ) ++ multiDel ws (delete w ls )
 
-addTreeview ls gui w str n  = do 
-		list <- listStoreNew ls
-		treeview <- Model.treeViewNewWithModel list
-		Model.treeViewSetHeadersVisible treeview True 
-	    	col <- Model.treeViewColumnNew
-		Model.treeViewColumnSetTitle col str
-		renderer <- Model.cellRendererTextNew
-		Model.cellLayoutPackStart col renderer False
-		Model.cellLayoutSetAttributes col renderer list
-			$ \ind -> [Model.cellText := ind]
-		Model.treeViewAppendColumn treeview col
-		set treeview [ widgetWidthRequest := n]
-		boxPackStartDefaults w treeview
+
 
 
 
@@ -1507,13 +1546,19 @@ odeClicked gui defs =
 		let ls = lines(prettyODE tds dpdt )
 		let [s,d] = transpose (map (splitOn "===>") ls)
 
-		addTreeview s gui (hbox10 gui) "Equation" 30
-		addTreeview d gui (hbox10 gui) "Formula" 60
+		addTreeview s gui (hbox10 gui) "Equation" 100
+		addTreeview d gui (hbox10 gui) "Formula" 200
 
 		widgetShowAll (hbox1 gui)
 		labelSetLabel (odelabel gui) "ODE's";
 	else do	labelSetLabel (odelabel gui) "ODE's";
         
+
+
+--maybeID :: Attr DrawingArea (Maybe (ConnectId DrawingArea))
+--maybeID = unsafePerformIO $ objectCreateAttribute
+
+
 
 plotClicked :: GUI -> Var [Definition] -> Var[Bool] -> IO ()
 plotClicked gui defs plots =
@@ -1547,40 +1592,27 @@ plotClicked gui defs plots =
 
 					putMVar plots bools
 					addChecks gui plots 0 sps
-					box <- containerGetChildren (hbox7 gui)
-					pbox <- containerGetChildren (vbox5 gui)
-					containerRemove (vbox5 gui) (pbox!!(0))
-					drawingArea <- drawingAreaNew
-					boxPackStartDefaults (vbox5 gui) drawingArea
-					boxReorderChild (vbox5 gui) drawingArea 0
-  					drawingArea `onExpose` brap2 drawingArea ts' solns ss ss'
+					let drawArea = (drawingArea1 gui)
+					widgetSetSizeRequest drawArea  640 480
+					(ww, wh) <- widgetGetSizeRequest drawArea
+					plotTimeSeriesFilteredD drawArea ts' solns ss ss' ww wh
 					widgetShowAll (vbox5 gui)
-					(rePlotBtn gui) `onClicked` filterPlot gui plots ts' solns ss ss'
-					(plotSaveBtn gui) `onClicked` plotSave gui plots ts' solns ss'
+					on (rePlotBtn gui)  buttonActivated $ filterPlot gui plots ts' solns ss ss'
+					on (plotSaveBtn gui) buttonActivated $ plotSave gui plots ts' solns ss'
 					labelSetLabel (plotlabel gui) "Plot";
 				else do labelSetLabel (plotlabel gui) "error invalid entries";
 		else labelSetLabel (plotlabel gui) "error invalid entries";
 	else do	labelSetLabel (plotlabel gui) "error no model loaded";
 
 
-brap drawArea ts' solns ss _evt = do 
-				
-				success <- plotTimeSeriesD drawArea ts' solns ss
-				return True
-
-brap2 drawArea ts' solns ss ss' _evt = do 
-				
-				success <- plotTimeSeriesFilteredD drawArea ts' solns ss ss'
-				return True
-
 
 
 addChecks gui plots _ [] = return ()
 addChecks gui plots n (l:ls) = do 	
 				c <- checkButtonNewWithLabel l
-				boxPackStartDefaults (hbox7 gui) c
+				boxPackStart (hbox7 gui) c PackNatural 0
  				set c [toggleButtonActive := True]
-				c `onToggled` flipplots gui n plots
+				on c toggled $ flipplots gui n plots
 				addChecks gui plots (n+1) ls
 
 fillPlot n = replicate n True
@@ -1601,12 +1633,8 @@ filterPlot gui plots ts' solns ss ss'  = do
 			a <- readVar plots
 			let blss = zip a ss' 
 			let fs =  specFill blss
-			pbox <- containerGetChildren (vbox5 gui)
-			containerRemove (vbox5 gui) (pbox!!(0))
-			drawingArea <- drawingAreaNew
-			boxPackStartDefaults (vbox5 gui) drawingArea
-			boxReorderChild (vbox5 gui) drawingArea 0
-  			drawingArea `onExpose` brap2 drawingArea ts' solns ss fs
+			(ww, wh) <- widgetGetSizeRequest (drawingArea1 gui)
+			plotTimeSeriesFilteredD (drawingArea1 gui) ts' solns ss fs ww wh
 			widgetShowAll (vbox5 gui)
 
 
@@ -1670,7 +1698,7 @@ tableClicked gui defs =
 			tabpointstemp <- entryGetText $ simPointsEntry gui; 	
 			tabendtemp <- entryGetText $ simEndEntry gui; 
 			tabstarttemp <- entryGetText $ simStartEntry gui;		
-			if ((isInteger tabpointstemp ) && (isInteger tabstarttemp) && ( isInteger tabendtemp)) && (((read tabpointstemp::Int) > 1) && ((read tabstarttemp::Int) > -1) && ((read tabendtemp::Int) > 1) && ((read tabendtemp::Int) > (read tabstarttemp::Int)))
+			if ((isInteger tabpointstemp ) && (isInteger tabstarttemp) && ( isInteger tabendtemp)) && (((read tabpointstemp::Float) > 1) && ((read tabstarttemp::Float) > -1) && ((read tabendtemp::Float) > 1) && ((read tabendtemp::Float) > (read tabstarttemp::Float)))
 				then do 
 					
 					let mts = processMTS tds p
@@ -1795,8 +1823,9 @@ phaseClicked gui defs =
 				let file = "graph.out"
 				let ss = speciesIn tds dpdt
 				let ss' = speciesInProc p
-				success <- phasePlot2D (drawArea2 gui) ts' solns ss ((ss'!!(s1n)), (ss'!!(s2n))) 
-				(phaseSaveBtn gui) `onClicked` phaseSave gui ts' solns ss ((ss'!!(s1n)), (ss'!!(s2n))) 
+				phasePlot2D (drawingArea2 gui) ts' solns ss ((ss'!!(s1n)), (ss'!!(s2n))) 400 400
+  				--on (drawArea2 gui) mapSignal $ brapPhase (drawArea2 gui) ts' solns ss ((ss'!!(s1n)), (ss'!!(s2n)))
+				(phaseSaveBtn gui) `on` buttonActivated $ phaseSave gui ts' solns ss ((ss'!!(s1n)), (ss'!!(s2n))) 
 				labelSetLabel (phaselabel gui) "Phase Plot"
 			else do	labelSetLabel (phaselabel gui) "error";
 		else do	labelSetLabel (tablabel gui) "error invalid entries";
@@ -1893,7 +1922,7 @@ fillTable gui spectable tvs n = do
 
 				tv <- (tvs!!(n-1))
 				addTableColumnwithoutstore gui (tv) (spectable!!(n-1)) 
-				boxPackStartDefaults (hbox2 gui)  (tv)
+				boxPackStart (hbox2 gui)  (tv)  PackNatural 0
 				boxReorderChild (hbox2 gui) tv  (n-1)
 				widgetShowAll (hbox2 gui) 
 				fillTable gui  spectable tvs (n-1)
