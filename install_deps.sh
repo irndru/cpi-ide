@@ -6,7 +6,7 @@ apt-get -y install happy
 apt-get -y install alex 
 apt-get -y install libcairo2-dev 
 apt-get -y install libpango1.0-dev 
-apt-get -y install gtk+-2.0 
+apt-get -y install gtk+-3.0 
 apt-get -y install glib-2.0 
 apt-get -y install gsl-bin 
 apt-get -y install gsl-ref-html 
@@ -16,7 +16,6 @@ apt-get -y install libghc-gtksourceview2-dev
 apt-get -y install cabal-install 
 cabal update
 cabal install gtk2hs-buildtools --global
-cabal install text hledger gtk MissingH hmatrix data-accessor colour 
+cabal install text hledger gtk3 MissingH hmatrix data-accessor colour Chart
 cabal install gtksourceview2-0.12.3.1 --reinstall
-ghc-pkg unregister Chart
-cabal install chart-0.14 
+
