@@ -16,6 +16,6 @@ apt-get -y install gtksourceview3
 apt-get -y install cabal-install 
 cabal update
 cabal install gtk2hs-buildtools --global
-cabal install text hledger gtk3 MissingH hmatrix data-accessor colour Chart
+cabal install text hledger gtk3 MissingH hmatrix data-accessor colour Chart Chart-cairo
 cabal install hmatrix-gsl
 cabal install gtksourceview3
