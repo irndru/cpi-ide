@@ -1335,6 +1335,10 @@ parseClicked gui defs mainText =
 		widgetShowAll (vbox13 gui)
 		case parseFile text of
 			Left err -> do 
+				box <- containerGetChildren (hbox18 gui)
+				mapM_ (containerRemove (hbox18 gui)) box
+				box2 <- containerGetChildren (vbox8 gui)
+				mapM_ (containerRemove (vbox8 gui)) box2		
 				errLbl <- labelNew ( Just (show err))
 				boxPackStart (hbox18 gui) errLbl PackNatural 0
 				widgetShowAll (hbox18 gui)
