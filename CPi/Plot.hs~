@@ -99,7 +99,7 @@ plotTimeSeriesFilteredD  drawarea ts soln ss ss' ww wh
 
 
 {-- Only plots selected species to a PDF file--}
-plotTimeSeriesToFileFiltered :: LA.Vector Double -> LA.Matrix Double -> [Species] -> [Species] -> String -> IO (PickFn a) 
+plotTimeSeriesToFileFiltered :: LA.Vector Double -> LA.Matrix Double -> [Species] -> [Species] -> String -> IO (PickFn ()) 
 plotTimeSeriesToFileFiltered ts soln ss ss' file 
     = plotToFile
       (LA.toList ts) 

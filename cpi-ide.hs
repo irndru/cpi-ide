@@ -180,6 +180,7 @@ import CPi.ODE ( timePoints, speciesIn, solveODE, prettyODE, dPdt )
 import CPi.Plot
     ( plotTimeSeriesToFile,
       plotTimeSeriesFilteredD,
+      plotTimeSeriesToFileFiltered,
       plotTimeSeriesD,
       phasePlot2ToFile,
       phasePlot2D,
@@ -557,7 +558,7 @@ connectGui gui defs plots mainText =
 					tableClicked gui defs
 					comboBoxSetActive (phaseSpecies1Combobox gui) 0 
 					comboBoxSetActive (phaseSpecies2Combobox gui) 1 
-					
+					phaseClicked gui defs 
 					)
 
         onToolButtonClicked (mdlChk gui) $ modelCheckClicked gui defs
@@ -1244,30 +1245,30 @@ csvSaviourSaveBtnClicked defs gui =
             Nothing -> widgetHide (opener gui) 
 
 --plotSave :: Var[Definition] -> GUI -> IO ()
-plotSave gui plots ts' solns ss' =
+plotSave gui plots ts' solns ss ss' =
     do
-	(plotSaviourBtn gui) `on` buttonActivated $ plotSaviourBtnClicked  gui plots ts' solns ss'
+	(plotSaviourBtn gui) `on` buttonActivated $ plotSaviourBtnClicked  gui plots ts' solns ss ss'
 	fileChooserSetAction (plotSaviour gui) FileChooserActionSave            
         windowPresent (plotSaviour gui)
 
 
 
 --plotSaviourBtnClicked :: Var[Definition] -> GUI -> IO()
-plotSaviourBtnClicked  gui plots ts' solns ss' =
+plotSaviourBtnClicked  gui plots ts' solns ss ss' =
 	do
 		file <- fileChooserGetFilename (plotSaviour gui) 
         	case file of
            		Just fpath -> do
-				plotFilterAndSave (init(tail(show fpath))) gui  plots ts' solns ss'
+				plotFilterAndSave (init(tail(show fpath))) gui  plots ts' solns ss ss'
 				widgetHide (plotSaviour gui) 
             		Nothing -> widgetHide (opener gui) 
 
-plotFilterAndSave file gui plots ts solns ss = do
+plotFilterAndSave file gui plots ts solns ss ss' = do
 		a <- readVar plots
 		let blss = zip a ss 
-		let fs = specFill blss	
-		print ""
-		plotTimeSeriesToFile ts solns ss  file 
+		let ss = specFill blss	
+		
+		plotTimeSeriesToFileFiltered ts solns ss ss' file 
 
 
 phaseSave gui ts' solns ss ss' =
@@ -1284,7 +1285,7 @@ phaseSaviourBtnClicked  gui ts' solns ss ss' =
 		file <- fileChooserGetFilename (phaseSaviour gui) 
         	case file of
            		Just fpath -> do
-				--phasePlot2ToFile ts' solns ss ss' (init(tail(show fpath)))
+				phasePlot2ToFile ts' solns ss ss' (init(tail(show fpath)))
 				--plotFilterAndSave (init(tail(show fpath))) gui  plots ts' solns ss'
 				widgetHide (phaseSaviour gui) 
             		Nothing -> widgetHide (opener gui) 
@@ -1334,7 +1335,9 @@ parseClicked gui defs mainText =
 		widgetShowAll (vbox13 gui)
 		case parseFile text of
 			Left err -> do 
-				return()
+				errLbl <- labelNew ( Just (show err))
+				boxPackStart (hbox18 gui) errLbl PackNatural 0
+				widgetShowAll (hbox18 gui)
 			Right ds -> do
 				widgetSetSensitive (vbox15 gui) True
 				box <- containerGetChildren (hbox18 gui)
@@ -1593,12 +1596,12 @@ plotClicked gui defs plots =
 					putMVar plots bools
 					addChecks gui plots 0 sps
 					let drawArea = (drawingArea1 gui)
-					widgetSetSizeRequest drawArea  640 480
+					widgetSetSizeRequest drawArea  600 400
 					(ww, wh) <- widgetGetSizeRequest drawArea
 					plotTimeSeriesFilteredD drawArea ts' solns ss ss' ww wh
 					widgetShowAll (vbox5 gui)
 					on (rePlotBtn gui)  buttonActivated $ filterPlot gui plots ts' solns ss ss'
-					on (plotSaveBtn gui) buttonActivated $ plotSave gui plots ts' solns ss'
+					on (plotSaveBtn gui) buttonActivated $ plotSave gui plots ts' solns ss ss'
 					labelSetLabel (plotlabel gui) "Plot";
 				else do labelSetLabel (plotlabel gui) "error invalid entries";
 		else labelSetLabel (plotlabel gui) "error invalid entries";
@@ -1823,7 +1826,10 @@ phaseClicked gui defs =
 				let file = "graph.out"
 				let ss = speciesIn tds dpdt
 				let ss' = speciesInProc p
-				phasePlot2D (drawingArea2 gui) ts' solns ss ((ss'!!(s1n)), (ss'!!(s2n))) 400 400
+				let drawArea = (drawingArea2 gui)
+				widgetSetSizeRequest drawArea  600 400
+				(ww, wh) <- widgetGetSizeRequest drawArea
+				phasePlot2D drawArea ts' solns ss ((ss'!!(s1n)), (ss'!!(s2n))) 600 400
   				--on (drawArea2 gui) mapSignal $ brapPhase (drawArea2 gui) ts' solns ss ((ss'!!(s1n)), (ss'!!(s2n)))
 				(phaseSaveBtn gui) `on` buttonActivated $ phaseSave gui ts' solns ss ((ss'!!(s1n)), (ss'!!(s2n))) 
 				labelSetLabel (phaselabel gui) "Phase Plot"
