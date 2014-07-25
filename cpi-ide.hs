@@ -34,6 +34,7 @@ import Graphics.UI.Gtk
       TextWindowType(TextWindowLeft),
       Packing(PackGrow, PackNatural),
       ConnectId,
+      TextView,
       windowResize,
       windowPresent,
       castToWindow,
@@ -211,15 +212,15 @@ main :: IO ()
 main =
     do	
 	initGUI 
-        defs <- newVar []
+        -- <- newVar []
 	plots <- newVar[]
         gui <- loadGlade "cpi-ide.glade"
-	editor gui defs plots
+	editor gui  plots
 	mainGUI
 	
 
-editor :: GUI -> Barrier [Definition] -> Barrier[Bool]->  IO()
-editor gui defs plots = do
+editor :: GUI ->  Barrier[Bool]->  IO()
+editor gui  plots = do
 
 		lm <- sourceLanguageManagerNew
 		sourceLanguageManagerSetSearchPath lm (Just ["./lang/"])      
@@ -249,7 +250,7 @@ editor gui defs plots = do
 		
 		boxPackStart (hbox1 gui) mainText  PackNatural 0
 		boxReorderChild (hbox1 gui) mainText   0
-		connectGui gui defs plots mainText
+		connectGui gui  plots mainText
 		widgetShowAll mainText
 
 loadGlade :: FilePath -> IO GUI
@@ -539,8 +540,8 @@ data GUI = GUI {
 
 
 
-connectGui :: GUI -> Barrier [Definition]  -> Barrier [Bool] -> SourceView -> IO (ConnectId Button)
-connectGui gui defs plots mainText =
+connectGui :: GUI ->  Barrier [Bool] -> SourceView -> IO (ConnectId Button)
+connectGui gui  plots mainText =
     do
 	on  (mainWin gui) objectDestroy mainQuit
         on (fileOpen gui)  menuItemActivated $ windowPresent $ opener gui 
@@ -551,78 +552,78 @@ connectGui gui defs plots mainText =
         on (aboutCloseBtn gui)  buttonActivated $ widgetHide $ aboutDialog gui
 
 
-        onToolButtonClicked (parse gui ) $ parseClicked gui defs mainText
- 	onToolButtonClicked (ode gui) $ odeClicked gui defs
+        onToolButtonClicked (parse gui ) $ parseClicked gui  mainText
+ 	onToolButtonClicked (ode gui) $ odeClicked gui 
 	on (simButton gui)  buttonActivated ( do 
-					plotClicked gui defs plots
-					tableClicked gui defs
+					plotClicked gui  plots
+					tableClicked gui 
 					comboBoxSetActive (phaseSpecies1Combobox gui) 0 
 					comboBoxSetActive (phaseSpecies2Combobox gui) 1 
-					phaseClicked gui defs 
+					phaseClicked gui  
 					)
 
-        onToolButtonClicked (mdlChk gui) $ modelCheckClicked gui defs
-	on (csvButton gui)  buttonActivated $ saveCSVas defs gui
-	on (phaseButton gui)  buttonActivated $ phaseClicked gui defs
+        onToolButtonClicked (mdlChk gui) $ modelCheckClicked gui 
+	on (csvButton gui)  buttonActivated $ saveCSVas  gui
+	on (phaseButton gui)  buttonActivated $ phaseClicked gui 
 --opener 
         on (openerBtn gui)  buttonActivated $ openerBtnClicked gui mainText
         on (openerBtnCancel gui)  buttonActivated $ widgetHide $ opener gui
 --saver      
         on (saviourBtn gui)  buttonActivated $ saviourSaveBtnClicked gui mainText
-        on (csvSaviourBtn gui)  buttonActivated $ csvSaviourSaveBtnClicked defs gui 
+        on (csvSaviourBtn gui)  buttonActivated $ csvSaviourSaveBtnClicked  gui 
 		
 
         on (saviourBtnCancel gui)  buttonActivated $ widgetHide $ saviour gui
         on (csvSaviourBtnCancel gui)  buttonActivated $ widgetHide $ csvSaviour gui
 
-	on (newBtn gui )  buttonActivated $ alter gui defs
+	on (newBtn gui )  buttonActivated $ alter gui 
 
 
 
 
-alter :: GUI -> Var [Definition] -> IO()
-alter gui defs = 
+alter :: GUI ->  IO()
+alter gui  = 
 	do 
 	sourceView <- sourceViewNew
 	widgetShowAll (vbox14 gui)
 	containerRemove (dropHBox gui) (newBtn gui)
-	collectComboT gui (hbox19 gui) defs sourceView
+	collectComboT gui (hbox19 gui)  sourceView
 
 
 
-removeHBoxT :: GUI -> HBox -> HBox -> Var [Definition] -> SourceView -> IO()
-removeHBoxT gui line hb defs sv  =
+removeHBoxT :: GUI -> HBox -> HBox ->  SourceView -> IO()
+removeHBoxT gui line hb  sv  =
 			do
 			p <- GTK.get line (boxChildPosition (dropHBox gui)  )
 
 			if ( p < 2) then do
 					containerRemove (dropHBox gui) hb
-					initComboT gui line defs sv
+					initComboT gui line  sv
 			else do 
 				containerRemove (dropHBox gui) hb
-				initComboTV gui line defs sv
+				initComboTV gui line  sv
 
 
-removeHBox :: GUI -> HBox -> HBox -> Var [Definition] -> SourceView -> IO()
-removeHBox gui line  hb defs sv =
+removeHBox :: GUI -> HBox -> HBox ->  SourceView -> IO()
+removeHBox gui line  hb  sv =
 			do
 			containerRemove (dropHBox gui) hb
-			initComboTV gui line defs sv
+			initComboTV gui line  sv
 
-removeHBoxO:: GUI -> HBox -> HBox -> Var [Definition] -> SourceView -> IO()
-removeHBoxO gui line  hb defs sv =
+removeHBoxO:: GUI -> HBox -> HBox ->  SourceView -> IO()
+removeHBoxO gui line  hb  sv =
 			do
 			containerRemove (dropHBox gui) hb
-			initComboO gui line defs sv
+			initComboO gui line  sv
 
-removeHBoxV:: GUI -> HBox -> HBox -> Var [Definition] -> SourceView -> IO()
-removeHBoxV gui line  hb defs sv =
+removeHBoxV:: GUI -> HBox -> HBox ->  SourceView -> IO()
+removeHBoxV gui line  hb  sv =
 			do
 			containerRemove (dropHBox gui) hb
-			initComboV gui line defs sv
+			initComboV gui line  sv
 
-collectTim :: GUI -> HBox -> HBox -> ComboBox ->  Entry -> Entry -> Var [Definition] -> SourceView -> IO()
-collectTim gui line hb cb f t  defs sourceView = do
+collectTim :: GUI -> HBox -> HBox -> ComboBox ->  Entry -> Entry ->  SourceView -> IO()
+collectTim gui line hb cb f t   sourceView = do
 	
 	n <- comboBoxGetActive cb 
 	if (n == -1) then return()
@@ -640,11 +641,11 @@ collectTim gui line hb cb f t  defs sourceView = do
 						box <- containerGetChildren (dropHBox gui)
 						mapM_ (containerRemove (dropHBox gui)) box
 						leftBtn <- buttonNewWithLabel "<-"
-						on leftBtn  buttonActivated $ removeLblT gui line leftBtn timLbl defs sourceView endIt
+						on leftBtn  buttonActivated $ removeLblT gui line leftBtn timLbl  sourceView endIt
 						boxPackStart line leftBtn PackNatural 0
 						boxReorderChild line (dropHBox gui) 0				
 						boxPackStart line timLbl PackNatural 0
-						initComboTV gui line defs sourceView
+						initComboTV gui line  sourceView
 						set line [boxChildPacking leftBtn := PackNatural, boxChildPacking timLbl := PackNatural]
 						boxReorderChild line (dropHBox gui) 1
 						box2 <- containerGetChildren hb
@@ -662,13 +663,13 @@ collectTim gui line hb cb f t  defs sourceView = do
 					else return()
 				else return()
 
-removeLbl gui line leftBtn lbl defs sv = do
+removeLbl gui line leftBtn lbl  sv = do
 					containerRemove line leftBtn
 					containerRemove line lbl
 					widgetShowAll line
-					initComboTV gui line defs sv
+					initComboTV gui line  sv
 
-removeLblO gui line leftBtn lbl defs sv endIt = do
+removeLblO gui line leftBtn lbl  sv endIt = do
 					
 					
 					str <- labelGetText lbl
@@ -686,14 +687,14 @@ removeLblO gui line leftBtn lbl defs sv endIt = do
 					if (length box) > 2 then do 
 								box2 <- containerGetChildren (dropHBox gui)
 								mapM_ (containerRemove (dropHBox gui)) box2
-								initComboO gui line defs sv
+								initComboO gui line  sv
 					else 
 						return ()
 
 slice from to xs = take (to - from + 1) (drop from xs)
 
 
-removeLblT gui line leftBtn timLbl defs sv endIt = do
+removeLblT gui line leftBtn timLbl  sv endIt = do
 					str <- labelGetText timLbl
 					txt <- entryGetText (entry1 gui)
 					let t = Utils.replace  str " " txt
@@ -709,13 +710,13 @@ removeLblT gui line leftBtn timLbl defs sv endIt = do
 					if (n > 2) then do 
 						box2 <- containerGetChildren (dropHBox gui)
 						mapM_ (containerRemove (dropHBox gui)) box2
-						initComboTV gui line defs sv
+						initComboTV gui line  sv
 					else do
 						box2 <- containerGetChildren (dropHBox gui)
 						mapM_ (containerRemove (dropHBox gui)) box2
-						initComboT gui line defs sv
+						initComboT gui line  sv
 
-removeLblV gui line leftBtn timLbl defs sv endIt = do
+removeLblV gui line leftBtn timLbl  sv endIt = do
 					str <- labelGetText timLbl
 					txt <- entryGetText (entry1 gui)
 					let t = Utils.replace  str " " txt
@@ -732,47 +733,47 @@ removeLblV gui line leftBtn timLbl defs sv endIt = do
 						box2 <- containerGetChildren (dropHBox gui)
 						containerRemove (dropHBox gui) (box2!!0)
 						box2 <- containerGetChildren (dropHBox gui)
-						initComboV gui line defs sv
+						initComboV gui line  sv
 					else return()
 
 
 
-initComboTV :: GUI -> HBox -> Var [Definition] -> SourceView -> IO ()
-initComboTV gui line defs sv  = do
+initComboTV :: GUI -> HBox ->  SourceView -> IO ()
+initComboTV gui line  sv  = do
 			cb <- comboBoxNewText			
 			comboBoxAppendText cb "Time"
 			comboBoxAppendText cb "Value"
 			boxPackStart (dropHBox gui) cb PackNatural 0
-			on cb  changed $ collectComboTV gui line cb defs sv
+			on cb  changed $ collectComboTV gui line cb  sv
 			widgetShowAll (dropHBox gui)
 
-initComboT :: GUI -> HBox -> Var [Definition] -> SourceView -> IO ()
-initComboT gui line defs sv = do
+initComboT :: GUI -> HBox ->  SourceView -> IO ()
+initComboT gui line  sv = do
 			cb <- comboBoxNewText			
 			comboBoxAppendText cb "Time"
 			boxPackStart (dropHBox gui) cb PackNatural 0
-			cb `on` changed $ collectComboT gui line defs sv
+			cb `on` changed $ collectComboT gui line  sv
 			widgetShowAll (dropHBox gui)
 
-initComboV :: GUI -> HBox -> Var [Definition] -> SourceView -> IO ()
-initComboV gui line defs  sv = do
+initComboV :: GUI -> HBox ->  SourceView -> IO ()
+initComboV gui line   sv = do
 			cb <- comboBoxNewText			
 			comboBoxAppendText cb "Value"
 			boxPackEnd (dropHBox gui) cb PackNatural 0
-			cb `on` changed $ collectComboV gui line defs sv
+			cb `on` changed $ collectComboV gui line  sv
 			widgetShowAll (dropHBox gui)
 
-initComboVfromO :: GUI -> HBox -> Var [Definition] -> SourceView -> IO ()
-initComboVfromO gui line defs  sv = do
+initComboVfromO :: GUI -> HBox ->  SourceView -> IO ()
+initComboVfromO gui line   sv = do
 			cb <- comboBoxNewText			
 			comboBoxAppendText cb "Value"
 			boxPackEnd (dropHBox gui) cb PackNatural 0
-			cb `on` changed $ collectComboVfromO gui line defs sv
+			cb `on` changed $ collectComboVfromO gui line  sv
 			widgetShowAll (dropHBox gui)
 
 
-initComboO :: GUI -> HBox -> Var [Definition] -> SourceView -> IO ()
-initComboO gui line defs  sv = do
+initComboO :: GUI -> HBox ->  SourceView -> IO ()
+initComboO gui line   sv = do
 			cb <- comboBoxNewText			
 			box <- containerGetChildren line
 			text <- entryGetText (entry1 gui)
@@ -788,20 +789,20 @@ initComboO gui line defs  sv = do
 					comboBoxAppendText cb "Or"
 						
 			boxPackEnd (dropHBox gui) cb PackNatural 0
-			cb `on` changed $ collectComboO gui line defs sv cb
+			cb `on` changed $ collectComboO gui line  sv cb
 			widgetShowAll (dropHBox gui)
 
-collectComboO :: GUI -> HBox -> Var [Definition] -> SourceView ->  ComboBox -> IO()
-collectComboO gui line defs sv cb = do
+collectComboO :: GUI -> HBox ->  SourceView ->  ComboBox -> IO()
+collectComboO gui line  sv cb = do
 				n <- comboBoxGetActive cb
 
 				if (n == 1) then do
-					removeAll gui line defs sv
+					removeAll gui line  sv
 				else if (n == 0) then do
 					hb <- hBoxNew False 3
 					box <- containerGetChildren (dropHBox gui)
 					mapM_ (containerRemove (dropHBox gui)) box
-					comboAddOp gui line hb defs sv 
+					comboAddOp gui line hb  sv 
 					boxPackStart (dropHBox gui) hb  PackNatural 0
 				else do
 					hb <- hBoxNew False 3
@@ -817,7 +818,7 @@ collectComboO gui line defs sv cb = do
 					mapM_ (containerRemove (dropHBox gui)) box
 					containerRemove line (dropHBox gui) 
 					boxPackStart  hb (dropHBox gui)  PackNatural 0
-					initComboTV gui hb defs sv
+					initComboTV gui hb  sv
 					boxPackStart (vbox14 gui) hb PackNatural 0
 					set (vbox14 gui) [boxChildPacking hb := PackNatural]
 					packing1 <- boxQueryChildPacking hb (dropHBox gui)
@@ -828,8 +829,8 @@ collectComboO gui line defs sv cb = do
 				
 
 
-removeAll gui line defs sv = do
-			tds <- readVar defs;
+removeAll gui line  sv = do
+			Just tds <- get (parse gui) modelDef 				;
 			text <- entryGetText (entry1 gui) 
 			let n = T.count (T.singleton '(') (T.pack text)
 			let m = T.count ( T.pack "||") ( T.pack text)
@@ -847,7 +848,7 @@ removeAll gui line defs sv = do
 			widgetShowAll line
 			box2 <- containerGetChildren (dropHBox gui)
 			mapM_ (containerRemove (dropHBox gui)) box2
-			initComboT gui line defs sv
+			initComboT gui line  sv
 			t <- entryGetText (entry1 gui) 
 			entrySetText (entry1 gui) ""
 			newEntry <- entryNew 
@@ -868,7 +869,7 @@ removeAll gui line defs sv = do
 			widgetShowAll (vbox14 gui)
 			
 			
---connectFormula entry btn defs
+--connectFormula entry btn 
 connectFormula entry lbl tds = do
 				let ps = pros tds;
 				let p = ps!!(0);
@@ -889,42 +890,42 @@ connectFormula entry lbl tds = do
 
 
 
-comboAddOp :: GUI -> HBox -> HBox -> Var [Definition] -> SourceView -> IO()
-comboAddOp gui line hb defs sv = do
+comboAddOp :: GUI -> HBox -> HBox ->  SourceView -> IO()
+comboAddOp gui line hb  sv = do
 	cb <- comboBoxNewText
 	addOp cb
-	cb `on` changed $ hotSwapComboO gui line cb hb defs sv
+	cb `on` changed $ hotSwapComboO gui line cb hb  sv
 	leftBtn <- buttonNewWithLabel "<-"
 	boxPackStart hb leftBtn  PackNatural 0
 	set hb [boxChildPacking leftBtn := PackNatural]
 	boxPackStart hb cb PackNatural 0
-	leftBtn `on` buttonActivated $ removeHBoxO gui line hb defs sv
+	leftBtn `on` buttonActivated $ removeHBoxO gui line hb  sv
 	widgetShowAll hb
 
 
 
-comboAddVal :: GUI -> HBox -> HBox -> Var [Definition] -> SourceView -> IO()
-comboAddVal gui line hb defs sv = do
+comboAddVal :: GUI -> HBox -> HBox ->  SourceView -> IO()
+comboAddVal gui line hb  sv = do
 	cb <- comboBoxNewText
 	addVal cb
-	cb `on` changed $ hotSwapComboTV gui line cb hb defs sv 
+	cb `on` changed $ hotSwapComboTV gui line cb hb  sv 
 	boxPackStart hb cb  PackNatural 0
 	widgetShowAll hb
 
 
-comboAddValfromO :: GUI -> HBox -> HBox -> Var [Definition] -> SourceView -> IO()
-comboAddValfromO gui line hb defs sv = do
+comboAddValfromO :: GUI -> HBox -> HBox ->  SourceView -> IO()
+comboAddValfromO gui line hb  sv = do
 	cb <- comboBoxNewText
 	addVal cb
 
-	cb `on` changed $ hotSwapComboTV gui line cb hb defs sv 
+	cb `on` changed $ hotSwapComboTV gui line cb hb  sv 
 	boxPackStart hb cb PackNatural 0
 	widgetShowAll hb
 
 
 
-hotSwapComboO :: GUI -> HBox -> ComboBox -> HBox -> Var [Definition] -> SourceView -> IO()
-hotSwapComboO gui line cb hb defs sv = do 
+hotSwapComboO :: GUI -> HBox -> ComboBox -> HBox ->  SourceView -> IO()
+hotSwapComboO gui line cb hb  sv = do 
 			i <- comboBoxGetActive cb
 			box <- containerGetChildren hb
 			if length(box) > 3 then do
@@ -935,7 +936,7 @@ hotSwapComboO gui line cb hb defs sv = do
 					cb <- comboBoxNewText
 					addRel cb
 					relBtn <- buttonNewWithLabel "Add"
-		 			relBtn  `on` buttonActivated $ collectOpR gui line defs cb sv 
+		 			relBtn  `on` buttonActivated $ collectOpR gui line  cb sv 
 					boxPackStart hb cb  PackNatural 0
 					boxPackStart hb relBtn PackNatural 0
 					boxReorderChild hb cb 2
@@ -944,15 +945,15 @@ hotSwapComboO gui line cb hb defs sv = do
 					cb <- comboBoxNewText
 					addAri cb
 					ariBtn <- buttonNewWithLabel "Add"
-		 			ariBtn  `on` buttonActivated $ collectOpA gui line defs cb sv 
+		 			ariBtn  `on` buttonActivated $ collectOpA gui line  cb sv 
 					boxPackStart hb cb  PackNatural 0
 					boxPackStart hb ariBtn PackNatural 0
 					boxReorderChild hb cb 2
 					widgetShowAll hb
 
 
-collectOpR :: GUI -> HBox ->  Var [Definition] -> ComboBox -> SourceView -> IO()
-collectOpR gui line defs cb sv = do 
+collectOpR :: GUI -> HBox ->   ComboBox -> SourceView -> IO()
+collectOpR gui line  cb sv = do 
 				i <- comboBoxGetActive cb
 				endIt <- entryGetText (entry1 gui)
 				let optns = [" > "," < "," = "]
@@ -963,8 +964,8 @@ collectOpR gui line defs cb sv = do
 				box <- containerGetChildren (dropHBox gui)
 				mapM_ (containerRemove (dropHBox gui)) box
 				leftBtn <- buttonNewWithLabel "<-"
-				leftBtn `on` buttonActivated $ removeLblO gui line leftBtn opLbl defs sv endIt
-				initComboVfromO gui line defs sv
+				leftBtn `on` buttonActivated $ removeLblO gui line leftBtn opLbl  sv endIt
+				initComboVfromO gui line  sv
 				boxPackStart line leftBtn PackNatural 0
 
 				boxReorderChild line (dropHBox gui) 0				
@@ -984,8 +985,8 @@ collectOpR gui line defs cb sv = do
 				widgetShowAll line
 
 
-collectOpA :: GUI -> HBox -> Var [Definition] -> ComboBox  -> SourceView -> IO()
-collectOpA gui line defs cb sv = do 
+collectOpA :: GUI -> HBox ->  ComboBox  -> SourceView -> IO()
+collectOpA gui line  cb sv = do 
 				i <- comboBoxGetActive cb
 				endIt <- entryGetText (entry1 gui)
 				let optns = [" + "," - "," x "," / "]
@@ -996,8 +997,8 @@ collectOpA gui line defs cb sv = do
 				box <- containerGetChildren (dropHBox gui)
 				mapM_ (containerRemove (dropHBox gui)) box
 				leftBtn <- buttonNewWithLabel "<-"
-				leftBtn `on` buttonActivated $ removeLblO gui line leftBtn opLbl defs sv endIt
-				initComboVfromO gui line defs sv
+				leftBtn `on` buttonActivated $ removeLblO gui line leftBtn opLbl  sv endIt
+				initComboVfromO gui line  sv
 				boxPackStart line leftBtn PackNatural 0
 
 				boxReorderChild line (dropHBox gui) 0				
@@ -1012,30 +1013,30 @@ collectOpA gui line defs cb sv = do
 
 
 
-collectComboTV :: GUI -> HBox  -> ComboBox -> Var [Definition] -> SourceView -> IO()
-collectComboTV gui line cb defs sv  = do	
+collectComboTV :: GUI -> HBox  -> ComboBox ->  SourceView -> IO()
+collectComboTV gui line cb  sv  = do	
 			i <- comboBoxGetActive cb
 			box <- containerGetChildren (dropHBox gui)
 			if length(box) > 1 then do
 				containerRemove (dropHBox gui) (box!!(1))
 			else return()
 			if i == 0 then do
-					collectComboT gui line defs sv
+					collectComboT gui line  sv
 			else do
-				collectComboV gui line defs sv
+				collectComboV gui line  sv
 
-collectComboT :: GUI -> HBox -> Var [Definition] -> SourceView -> IO()
-collectComboT gui line defs sv = do
+collectComboT :: GUI -> HBox ->  SourceView -> IO()
+collectComboT gui line  sv = do
 			box <- containerGetChildren (dropHBox gui)
 
 			if length(box) > 1 then do
 				containerRemove (dropHBox gui) (box!!(1))
 			else return()
-			comboAddTim gui line defs sv
+			comboAddTim gui line  sv
 			
 
-comboAddTim :: GUI -> HBox -> Var [Definition] -> SourceView-> IO()
-comboAddTim gui line defs sv = 
+comboAddTim :: GUI -> HBox ->  SourceView-> IO()
+comboAddTim gui line  sv = 
 	do			
 	hb <- hBoxNew False 3
 	cb <- comboBoxNewText
@@ -1052,32 +1053,32 @@ comboAddTim gui line defs sv =
 	boxPackStart hb toTim PackNatural 0
 	boxPackStart hb timBtn PackNatural 0
 	set hb [ boxChildPacking fromTim := PackNatural, boxChildPacking toTim := PackNatural, boxChildPacking timBtn := PackNatural, boxChildPacking cb := PackNatural ]
-	timBtn  `on` buttonActivated $ collectTim gui line hb cb fromTim toTim defs sv
+	timBtn  `on` buttonActivated $ collectTim gui line hb cb fromTim toTim  sv
 	boxPackEnd (dropHBox gui) hb  PackNatural 0
 	widgetShowAll hb 
 	
 
 
-collectComboV :: GUI -> HBox -> Var [Definition] -> SourceView -> IO()
-collectComboV gui line defs sv = do
+collectComboV :: GUI -> HBox ->  SourceView -> IO()
+collectComboV gui line  sv = do
 			hb <- hBoxNew False 3
 			box <- containerGetChildren (dropHBox gui)
 			containerRemove (dropHBox gui) (box!!(0))
-			comboAddVal gui line hb defs sv 
+			comboAddVal gui line hb  sv 
 			boxPackStart (dropHBox gui) hb PackNatural 0
 
-collectComboVfromO :: GUI -> HBox -> Var [Definition] -> SourceView -> IO()
-collectComboVfromO gui line defs sv = do
+collectComboVfromO :: GUI -> HBox ->  SourceView -> IO()
+collectComboVfromO gui line  sv = do
 			hb <- hBoxNew False 3
 			box <- containerGetChildren (dropHBox gui)
 			containerRemove (dropHBox gui) (box!!(0))
-			comboAddValfromO gui line hb defs sv 
+			comboAddValfromO gui line hb  sv 
 			boxPackStart (dropHBox gui) hb PackNatural 0
 
 
 
-collectValS :: GUI -> HBox ->  Var [Definition] -> [String] -> ComboBox -> SourceView -> IO()
-collectValS gui line defs sns cb sv = do 
+collectValS :: GUI -> HBox ->   [String] -> ComboBox -> SourceView -> IO()
+collectValS gui line  sns cb sv = do 
 				n <- comboBoxGetActive cb
 				endIt <- entryGetText (entry1 gui)
 				if (n /= -1) then do
@@ -1089,8 +1090,8 @@ collectValS gui line defs sns cb sv = do
 					box <- containerGetChildren (dropHBox gui)
 					mapM_ (containerRemove (dropHBox gui)) box
 					leftBtn <- buttonNewWithLabel "<-"
-					leftBtn `on` buttonActivated $ removeLblV gui line leftBtn specLbl defs sv endIt
-					initComboO gui line defs sv 
+					leftBtn `on` buttonActivated $ removeLblV gui line leftBtn specLbl  sv endIt
+					initComboO gui line  sv 
 					boxPackStart line leftBtn PackNatural 0
 
 					boxReorderChild line (dropHBox gui) 0				
@@ -1118,8 +1119,8 @@ entryAppendText entry str = do
 
 
 
-collectValN :: GUI -> HBox  -> HBox -> Entry -> Var [Definition] -> SourceView -> IO()
-collectValN gui line hb valEntry defs  sv = do
+collectValN :: GUI -> HBox  -> HBox -> Entry ->  SourceView -> IO()
+collectValN gui line hb valEntry   sv = do
 	val <- entryGetText valEntry
 	endIt <- entryGetText (entry1 gui)
 	if (isInteger val) then do
@@ -1129,8 +1130,8 @@ collectValN gui line hb valEntry defs  sv = do
 		box <- containerGetChildren (dropHBox gui)
 		mapM_ (containerRemove (dropHBox gui)) box
 		leftBtn <- buttonNewWithLabel "<-"
-		leftBtn `on` buttonActivated $ removeLblV gui line leftBtn valLbl defs sv endIt
-		initComboO gui line defs sv
+		leftBtn `on` buttonActivated $ removeLblV gui line leftBtn valLbl  sv endIt
+		initComboO gui line  sv
 		boxPackStart line leftBtn PackNatural 0
 
 		boxReorderChild line (dropHBox gui) 0				
@@ -1153,8 +1154,8 @@ collectValN gui line hb valEntry defs  sv = do
 
 
 
-hotSwapComboTV :: GUI -> HBox -> ComboBox -> HBox -> Var [Definition] -> SourceView -> IO()
-hotSwapComboTV gui line cb hb defs sv = do 
+hotSwapComboTV :: GUI -> HBox -> ComboBox -> HBox ->  SourceView -> IO()
+hotSwapComboTV gui line cb hb  sv = do 
 			i <- comboBoxGetActive cb
 			box <- containerGetChildren (dropHBox gui)
 			box <- containerGetChildren hb
@@ -1164,7 +1165,7 @@ hotSwapComboTV gui line cb hb defs sv = do
 				containerRemove hb (box!!(2))
 			else return()
 			if i == 0 then do 
-					tds <- readVar defs;
+					Just tds <- get (parse gui) modelDef 				;
 					let ps = pros tds;
 					let pns = proNames tds
 					let p = ps!!(0);
@@ -1173,7 +1174,7 @@ hotSwapComboTV gui line cb hb defs sv = do
 					cb <- comboBoxNewText
 					addSpecs cb sns (length(sns)) (length(sns))
 					valBtn <- buttonNewWithLabel "Add"
-					valBtn  `on` buttonActivated $ collectValS gui line defs sns cb sv
+					valBtn  `on` buttonActivated $ collectValS gui line  sns cb sv
 					boxPackStart hb cb PackNatural 0
 					boxPackEnd hb valBtn PackNatural 0
 					boxReorderChild hb cb 2
@@ -1184,7 +1185,7 @@ hotSwapComboTV gui line cb hb defs sv = do
 				set valEntry [ widgetWidthRequest := 90]
 				valBtn <- buttonNewWithLabel "Add"
 				
-				valBtn  `on` buttonActivated $ collectValN gui line  hb valEntry defs sv
+				valBtn  `on` buttonActivated $ collectValN gui line  hb valEntry  sv
 				boxPackStart hb valEntry PackNatural 0
 				boxPackEnd hb valBtn  PackNatural 0
 				set hb [ boxChildPacking valEntry := PackNatural]
@@ -1225,8 +1226,8 @@ saveAs gui =
         fileChooserSetAction (saviour gui) FileChooserActionSave            
         windowPresent (saviour gui)
 
-saveCSVas :: Var[Definition] -> GUI -> IO ()
-saveCSVas defs gui =
+saveCSVas ::  GUI -> IO ()
+saveCSVas  gui =
     do
 	box <- containerGetChildren (hbox2 gui) 
 	if ((length box) > 0) then do
@@ -1234,17 +1235,17 @@ saveCSVas defs gui =
         			windowPresent (csvSaviour gui)
 	else do return()
 
-csvSaviourSaveBtnClicked :: Var[Definition] -> GUI -> IO ()
-csvSaviourSaveBtnClicked defs gui =
+csvSaviourSaveBtnClicked ::  GUI -> IO ()
+csvSaviourSaveBtnClicked  gui =
     do
         file <- fileChooserGetFilename (csvSaviour gui)
         case file of
             Just fpath -> do
-				csvSaveClicked (init(tail(show fpath))) gui defs
+				csvSaveClicked (init(tail(show fpath))) gui 
 				widgetHide (csvSaviour gui) 
             Nothing -> widgetHide (opener gui) 
 
---plotSave :: Var[Definition] -> GUI -> IO ()
+--plotSave ::  GUI -> IO ()
 plotSave gui plots ts' solns ss ss' =
     do
 	(plotSaviourBtn gui) `on` buttonActivated $ plotSaviourBtnClicked  gui plots ts' solns ss ss'
@@ -1253,7 +1254,7 @@ plotSave gui plots ts' solns ss ss' =
 
 
 
---plotSaviourBtnClicked :: Var[Definition] -> GUI -> IO()
+--plotSaviourBtnClicked ::  GUI -> IO()
 plotSaviourBtnClicked  gui plots ts' solns ss ss' =
 	do
 		file <- fileChooserGetFilename (plotSaviour gui) 
@@ -1279,7 +1280,7 @@ phaseSave gui ts' solns ss ss' =
 
 
 
---plotSaviourBtnClicked :: Var[Definition] -> GUI -> IO()
+--plotSaviourBtnClicked ::  GUI -> IO()
 phaseSaviourBtnClicked  gui ts' solns ss ss' =
 	do
 		file <- fileChooserGetFilename (phaseSaviour gui) 
@@ -1317,13 +1318,14 @@ save fileName gui mainText =
 	set (mainWin gui) [ windowTitle :=   fileName ]
 	textBufferSetModified buff False
 
-
+modelDef :: Attr ToolButton (Maybe ([Definition]))
+modelDef = unsafePerformIO $ objectCreateAttribute
 	 
 
 
 
-parseClicked :: GUI -> Var [Definition] -> SourceView -> IO ()
-parseClicked gui defs mainText =
+parseClicked :: GUI ->  SourceView -> IO ()
+parseClicked gui  mainText =
 	    do
 		coltemp <- treeViewGetColumns (treeView1 gui)
 		modelList <- listStoreNew (["Charlie","Delta"])
@@ -1346,9 +1348,10 @@ parseClicked gui defs mainText =
 				widgetSetSensitive (vbox15 gui) True
 				box <- containerGetChildren (hbox18 gui)
 				mapM_ (containerRemove (hbox18 gui)) box
-				a <- takeMVar defs
-				putMVar defs ds
-				tds <- readVar defs
+				set (parse gui) [ modelDef := (Just ds)]
+				Just tds <- get (parse gui) modelDef 				
+				
+				
 				let ps = fullpros tds
 				let ss = specs tds
 				let pss = (prettys ps)
@@ -1361,7 +1364,7 @@ parseClicked gui defs mainText =
 				--listStoreAppend (liststore1 gui) "Beta"
 				addTreeview s gui (hbox18 gui) "Species" 60
 				addTreeview d gui (hbox18 gui) "Definitions" 200
-				addTreeview cs gui (hbox18 gui) "Concentration" 40
+				addTreeview cs gui (hbox18 gui) "Concentration" 60
 				onCom text s gui
 				widgetShowAll (hbox18 gui)
 				widgetShowAll (odelabel gui)
@@ -1512,9 +1515,9 @@ openUrlBySystemTool url = do
 
 
 
-odeClicked :: GUI -> Var [Definition] -> IO ()
-odeClicked gui defs =
-    do  tds <- readVar defs;
+odeClicked :: GUI ->  IO ()
+odeClicked gui  =
+    do  Just tds <- get (parse gui) modelDef 				;
 	if (tds /= []) then do
 		let ps = pros tds;
 		let pns = proNames tds
@@ -1567,9 +1570,9 @@ odeClicked gui defs =
 
 
 
-plotClicked :: GUI -> Var [Definition] -> Var[Bool] -> IO ()
-plotClicked gui defs plots =
-    do 	tds <- readVar defs;
+plotClicked :: GUI ->  Var[Bool] -> IO ()
+plotClicked gui  plots =
+    do 	Just tds <- get (parse gui) modelDef 				;
 	if (tds /= []) then do
 		pn <- (comboBoxGetActive (simProComboBox gui))
 
@@ -1650,9 +1653,9 @@ specFill ((x,y):xs) = if (x == True) then
 				y: specFill xs
 		    else specFill xs
 
-modelCheckClicked :: GUI -> Var [Definition] -> IO ()
-modelCheckClicked gui defs =
-	do 	tds <- readVar defs;
+modelCheckClicked :: GUI ->  IO ()
+modelCheckClicked gui  =
+	do 	Just tds <- get (parse gui) modelDef 				;
 		
 
 		checkForm (formEntry1 gui) (formLbl1 gui) (formProBox1 gui) tds
@@ -1690,10 +1693,10 @@ checkForm formEntry formLbl proBox tds = do
 
 
 
-tableClicked :: GUI -> Var [Definition] -> IO ()
-tableClicked gui defs =
+tableClicked :: GUI ->  IO ()
+tableClicked gui  =
     do 	
-	tds <- readVar defs;
+	Just tds <- get (parse gui) modelDef 				;
 	if (tds /= []) then do
 		pn <- (comboBoxGetActive (simProComboBox gui))
 
@@ -1727,10 +1730,10 @@ tableClicked gui defs =
 			else do	labelSetLabel (tablabel gui) "error invalid entries";
 	else do	labelSetLabel (tablabel gui) "error no model loaded";
 	
-csvSaveClicked :: FilePath -> GUI -> Var [Definition] -> IO ()
-csvSaveClicked filepath gui defs =
+csvSaveClicked :: FilePath -> GUI ->  IO ()
+csvSaveClicked filepath gui  =
  do 	
-	tds <- readVar defs;
+	Just tds <- get (parse gui) modelDef 				;
 	if (tds /= []) then do
 		pn <- (comboBoxGetActive (simProComboBox gui))
 
@@ -1804,9 +1807,9 @@ repeatnumbers n i vs =
 
 
 
-phaseClicked :: GUI -> Var [Definition] -> IO ()
-phaseClicked gui defs =
-    do 	tds <- readVar defs;
+phaseClicked :: GUI ->  IO ()
+phaseClicked gui  =
+    do 	Just tds <- get (parse gui) modelDef 				;
 	if (tds /= []) then do
 		pn <- (comboBoxGetActive (simProComboBox gui))
 		s1n <- (comboBoxGetActive (phaseSpecies1Combobox gui))
