@@ -153,15 +153,7 @@ import Graphics.UI.Gtk.SourceView
       sourceBufferSetHighlightSyntax,
       sourceBufferNewWithLanguage )
 import Graphics.UI.Gtk.Layout.Table ()
-import Control.Concurrent.MVar
-    ( MVar,
-      takeMVar,
-      putMVar,
-      newMVar,
-      newEmptyMVar,
-      readMVar,
-      modifyMVar_,
-      modifyMVar )
+
 import Numeric.LinearAlgebra ( (@@>) )
 import Graphics.UI.Gtk.Gdk.EventM ()
 import Graphics.UI.Gtk.MenuComboToolbar.ComboBox ()
@@ -1844,31 +1836,6 @@ phaseClicked gui  =
 			else do	labelSetLabel (phaselabel gui) "error";
 		else do	labelSetLabel (tablabel gui) "error invalid entries";
 	else do	labelSetLabel (tablabel gui) "error invalid entries";
-
-type Var a = MVar a
-
-newVar :: a -> IO (Var a)
-newVar = newMVar
-
-modifyVar :: Var a -> (a -> IO (a, b)) -> IO b
-modifyVar = modifyMVar
-
-modifyVar_ :: Var a -> (a -> IO a) -> IO ()
-modifyVar_ = modifyMVar_
-
-readVar :: Var a -> IO a
-readVar = readMVar
-
-type Barrier a = MVar a
-
-newBarrier :: IO (Barrier a)
-newBarrier = newEmptyMVar
-
-signalBarrier :: Barrier a -> a -> IO ()
-signalBarrier = putMVar
-
-waitBarrier :: Barrier a -> IO a
-waitBarrier = readMVar
 
 isInteger s = case reads s :: [(Integer, String)] of
   [(_, "")] -> True
