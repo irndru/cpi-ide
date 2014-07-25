@@ -104,7 +104,7 @@ plotTimeSeriesToFileFiltered ts soln ss ss' file
     = plotToFile
       (LA.toList ts) 
       (filter (\(s,_)-> s `elem` (map specName ss'))
-       (zip (map pretty ss) (map LA.toList (LA.toColumns soln))))
+      (zip (map pretty ss) (map LA.toList (LA.toColumns soln))))
       file
 
 -- Plots the time series in a GTK window

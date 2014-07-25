@@ -66,7 +66,7 @@ plotTimeSeriesToFile ts soln ss file
 -- Only plots selected species
 plotTimeSeriesFiltered :: LA.Vector Double -> LA.Matrix Double -> [Species] -> [Species] 
                        -> IO ()
-plotTimeSeriesFiltered ts soln ss ss'
+plotTimeSeriesFiltered ts soln ss ss' 
     = plot
       (LA.toList ts)
       (filter (\(s,_)-> s `elem` (map specName ss')) 

@@ -213,14 +213,14 @@ main =
     do	
 	initGUI 
         -- <- newVar []
-	plots <- newVar[]
+	--plots <- newVar[]
         gui <- loadGlade "cpi-ide.glade"
-	editor gui  plots
+	editor gui  
 	mainGUI
 	
 
-editor :: GUI ->  Barrier[Bool]->  IO()
-editor gui  plots = do
+editor :: GUI ->   IO()
+editor gui  = do
 
 		lm <- sourceLanguageManagerNew
 		sourceLanguageManagerSetSearchPath lm (Just ["./lang/"])      
@@ -250,7 +250,7 @@ editor gui  plots = do
 		
 		boxPackStart (hbox1 gui) mainText  PackNatural 0
 		boxReorderChild (hbox1 gui) mainText   0
-		connectGui gui  plots mainText
+		connectGui gui  mainText
 		widgetShowAll mainText
 
 loadGlade :: FilePath -> IO GUI
@@ -540,8 +540,8 @@ data GUI = GUI {
 
 
 
-connectGui :: GUI ->  Barrier [Bool] -> SourceView -> IO (ConnectId Button)
-connectGui gui  plots mainText =
+connectGui :: GUI ->   SourceView -> IO (ConnectId Button)
+connectGui gui  mainText =
     do
 	on  (mainWin gui) objectDestroy mainQuit
         on (fileOpen gui)  menuItemActivated $ windowPresent $ opener gui 
@@ -555,7 +555,7 @@ connectGui gui  plots mainText =
         onToolButtonClicked (parse gui ) $ parseClicked gui  mainText
  	onToolButtonClicked (ode gui) $ odeClicked gui 
 	on (simButton gui)  buttonActivated ( do 
-					plotClicked gui  plots
+					plotClicked gui
 					tableClicked gui 
 					comboBoxSetActive (phaseSpecies1Combobox gui) 0 
 					comboBoxSetActive (phaseSpecies2Combobox gui) 1 
@@ -1246,30 +1246,29 @@ csvSaviourSaveBtnClicked  gui =
             Nothing -> widgetHide (opener gui) 
 
 --plotSave ::  GUI -> IO ()
-plotSave gui plots ts' solns ss ss' =
+plotSave gui ts' solns ss ss' =
     do
-	(plotSaviourBtn gui) `on` buttonActivated $ plotSaviourBtnClicked  gui plots ts' solns ss ss'
+	(plotSaviourBtn gui) `on` buttonActivated $ plotSaviourBtnClicked  gui ts' solns ss ss'
 	fileChooserSetAction (plotSaviour gui) FileChooserActionSave            
         windowPresent (plotSaviour gui)
 
 
 
 --plotSaviourBtnClicked ::  GUI -> IO()
-plotSaviourBtnClicked  gui plots ts' solns ss ss' =
+plotSaviourBtnClicked  gui ts' solns ss ss' =
 	do
 		file <- fileChooserGetFilename (plotSaviour gui) 
         	case file of
            		Just fpath -> do
-				plotFilterAndSave (init(tail(show fpath))) gui  plots ts' solns ss ss'
+				plotFilterAndSave (init(tail(show fpath))) gui  ts' solns ss ss'
 				widgetHide (plotSaviour gui) 
             		Nothing -> widgetHide (opener gui) 
 
-plotFilterAndSave file gui plots ts solns ss ss' = do
-		a <- readVar plots
+plotFilterAndSave file gui ts solns ss ss' = do
+		Just a <- get (rePlotBtn gui) plotList
 		let blss = zip a ss 
-		let ss = specFill blss	
-		
-		plotTimeSeriesToFileFiltered ts solns ss ss' file 
+		let fs = specFill blss	
+		plotTimeSeriesToFile ts solns ss  file 
 
 
 phaseSave gui ts' solns ss ss' =
@@ -1287,7 +1286,7 @@ phaseSaviourBtnClicked  gui ts' solns ss ss' =
         	case file of
            		Just fpath -> do
 				phasePlot2ToFile ts' solns ss ss' (init(tail(show fpath)))
-				--plotFilterAndSave (init(tail(show fpath))) gui  plots ts' solns ss'
+				--plotFilterAndSave (init(tail(show fpath))) gui  ts' solns ss'
 				widgetHide (phaseSaviour gui) 
             		Nothing -> widgetHide (opener gui) 
 
@@ -1570,8 +1569,8 @@ odeClicked gui  =
 
 
 
-plotClicked :: GUI ->  Var[Bool] -> IO ()
-plotClicked gui  plots =
+plotClicked :: GUI ->  IO ()
+plotClicked gui  =
     do 	Just tds <- get (parse gui) modelDef 				;
 	if (tds /= []) then do
 		pn <- (comboBoxGetActive (simProComboBox gui))
@@ -1597,41 +1596,43 @@ plotClicked gui  plots =
 					box <- containerGetChildren (hbox7 gui)
 					mapM_ (containerRemove (hbox7 gui)) box					
 					let sps = (map pretty ss')
-					a <- takeMVar plots
+
 					let bools = fillPlot $ length sps
 
-					putMVar plots bools
-					addChecks gui plots 0 sps
+					set (rePlotBtn gui) [ plotList := (Just bools)]					
+					addChecks gui 0 sps
 					let drawArea = (drawingArea1 gui)
 					widgetSetSizeRequest drawArea  600 400
 					(ww, wh) <- widgetGetSizeRequest drawArea
 					plotTimeSeriesFilteredD drawArea ts' solns ss ss' ww wh
 					widgetShowAll (vbox5 gui)
-					on (rePlotBtn gui)  buttonActivated $ filterPlot gui plots ts' solns ss ss'
-					on (plotSaveBtn gui) buttonActivated $ plotSave gui plots ts' solns ss ss'
+					on (rePlotBtn gui)  buttonActivated $ filterPlot gui ts' solns ss ss'
+					on (plotSaveBtn gui) buttonActivated $ plotSave gui ts' solns ss ss'
 					labelSetLabel (plotlabel gui) "Plot";
 				else do labelSetLabel (plotlabel gui) "error invalid entries";
 		else labelSetLabel (plotlabel gui) "error invalid entries";
 	else do	labelSetLabel (plotlabel gui) "error no model loaded";
 
 
+plotList :: Attr Button (Maybe ([Bool]))
+plotList = unsafePerformIO $ objectCreateAttribute
 
 
-addChecks gui plots _ [] = return ()
-addChecks gui plots n (l:ls) = do 	
+addChecks gui _ [] = return ()
+addChecks gui n (l:ls) = do 	
 				c <- checkButtonNewWithLabel l
 				boxPackStart (hbox7 gui) c PackNatural 0
  				set c [toggleButtonActive := True]
-				on c toggled $ flipplots gui n plots
-				addChecks gui plots (n+1) ls
+				on c toggled $ flipplots gui n 
+				addChecks gui (n+1) ls
 
 fillPlot n = replicate n True
 
 
-flipplots gui n plots = do 
-			bs <- takeMVar plots
+flipplots gui n = do 
+			Just bs <- get (rePlotBtn gui) plotList 				;
 			let c = swapbl bs n 0
-			putMVar plots c
+			set (rePlotBtn gui) [ plotList :=  ( Just c)]
 			
 
 swapbl [] _ _ = []
@@ -1639,8 +1640,8 @@ swapbl (b:bs) n i = if (n == i) then
 				(not b) : swapbl bs n (i+1)
 		    else b : swapbl bs n (i+1)
 	
-filterPlot gui plots ts' solns ss ss'  = do 
-			a <- readVar plots
+filterPlot gui ts' solns ss ss'  = do 
+			Just a <- get (rePlotBtn gui) plotList
 			let blss = zip a ss' 
 			let fs =  specFill blss
 			(ww, wh) <- widgetGetSizeRequest (drawingArea1 gui)

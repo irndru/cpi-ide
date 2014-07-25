@@ -61,7 +61,7 @@ renderableToWindow chart windowWidth windowHeight = do
     -- press any key to exit the loop
     on  (window) objectDestroy mainQuit
     widgetShowAll window
-    print windowWidth
+    --print windowWidth
     mainGUI
 
 -- | Create a new GTK window displaying a renderable.
@@ -90,9 +90,9 @@ updateCanvas chart canvas ww wh = do
 		Nothing -> return ()
     	let sz = (fromIntegral ww,fromIntegral wh)
     	id <- on canvas draw $ runBackend (defaultEnv bitmapAlignmentFns) ( void $ render chart sz) 
-	set canvas [ maybeID := (Just id),
-		     widgetVisible := False	 ]
-	return ()
+	set canvas [ maybeID := (Just id)]
+		     --widgetVisible := False	 ]
+	widgetQueueDraw canvas
 
 maybeID :: Attr DrawingArea (Maybe (ConnectId DrawingArea))
 maybeID = unsafePerformIO $ objectCreateAttribute

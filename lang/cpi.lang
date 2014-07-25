@@ -35,7 +35,7 @@
                 <regex>[:!#$%&amp;*+./&gt;=&lt;?@\\^|~\-]+</regex>
 	</pattern-item>
 
-	<keyword-list _name="Keysymbols" style = "Keyword">
+	<keyword-list _name="Keywords" style = "Keyword">
 		<keyword>::</keyword>
 		<keyword>-&gt;</keyword>
 		<keyword>&lt;-</keyword>

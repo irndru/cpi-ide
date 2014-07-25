@@ -211,7 +211,7 @@ odesCmd x = do env <- getEnv
 -- plot Command
 plotCmd :: String -> Environment ()
 plotCmd = plotOctaveCmd
-{-plotCmd x = do env <- getEnv;
+{--plotCmd x = do env <- getEnv;
                let args = words x
                -- TODO: properly parse the command!
                --       and have some defaults?
@@ -228,8 +228,9 @@ plotCmd = plotOctaveCmd
                                  let solns = solveODE env proc mts dpdt ts
                                  let ss = speciesIn env dpdt
                                  let ss' = speciesInProc proc
-                                 lift$lift$plotTimeSeriesFiltered ts' solns ss ss'
--}
+				 say "ah"
+                                 lift$lift$plotTimeSeries ts' solns ss ss'
+--}
 
 -- phase2 command
 phase2Cmd :: String -> Environment ()
@@ -279,7 +280,7 @@ plotFileCmd x = do env <- getEnv;
 				     return ()
 
 -- plotAll Command
--- Plot all species (inc complexes)
+--Plot all species (inc complexes)
 plotAllCmd :: String -> Environment ()
 plotAllCmd x = do env <- getEnv;
                   let args = words x
@@ -318,7 +319,8 @@ plotOctaveCmd x = do env <- getEnv;
                                        let solns = solveODEoctave env proc mts dpdt ts
                                        let ss = speciesIn env dpdt
                                        let ss' = speciesInProc proc
-                                       lift$lift$plotTimeSeriesFiltered ts' solns ss ss'
+                                       lift$lift$plotTimeSeriesFiltered ts' solns ss ss' 
+
 
 -- plot only the specified species
 plotOnlyCmd :: String -> Environment ()
